@@ -10,21 +10,13 @@ For now, this will be limited to TCP transport. I'm going to be looking at the D
     
     Example connection handshake
     
-    A connects to B
-    
-    B -> A  varint(19), "/multistream/1.0.0\n"
-    
-    A -> B  varint(19), "/multistream/1.0.0\n"
-    
-    Next we tell them we'd like to use secio
-    
-    A -> B  varint(13), "/secio/1.0.0\n"
-    
-    If they agree then they'll tell us. If not, they'd send 'na' as per spec.
-    
-    B -> A  varint(13), "/secio/1.0.0\n"
-    
-    Now, we switch to using secio.
+    | Comment               | A                                     | B                                     |
+    | --------------------- | ------------------------------------- | ------------------------------------- |
+    | TCP connection        | Connection to B established           |                                       |
+    | Multistream           |                                       | varint(19), "/multistream/1.0.0\n"    |
+    | Multistream           | varint(19), "/multistream/1.0.0\n"    |                                       |
+    | Ask for secio         | varint(13), "/secio/1.0.0\n"          |                                       |
+    | Agree to secio        |                                       | varint(13), "/secio/1.0.0\n"          |
     
 2. secio
     Next step is to negotiate security.
