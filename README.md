@@ -31,7 +31,7 @@ For now, this will be limited to TCP transport. I'm going to be looking at the D
     Messages are prefixed with a 32bit length big endian
     https://github.com/libp2p/specs/tree/master/secio
     
-    B -> A  int32length, data
+    B -> A  int32length, data (Propose)
     
     The data is a protobuff encoded 'Propose' message as per spec. This contains the public key for B, along with a list of exchanges,ciphers and hashes.
 
@@ -43,3 +43,15 @@ For now, this will be limited to TCP transport. I'm going to be looking at the D
         exchanges: "P-256,P-384,P-521"
         ciphers: "AES-256,AES-128"
         hashes: "SHA256,SHA512"
+        
+    We need to send out our own Propose message now. Generate our own random bytes, generate a public key etc.
+    
+    A -> B  int32length, data (Propose)
+
+    Next we should receive an Exchange message.
+    
+    B -> A  int32length, data (Exchange)
+    
+    An example Exchange message
+    epubkey: "\004\276\331n\027!\236r\346\375E\231?2j\225~\f\"\341\301\002\262/\374)wY\016+B\345\024\224\345\200\2518gJ1V\213/\270s@@ +\371\f\300N\005|\\\216F^WJ\3278\223"
+signature: "5\212\311\364V\241\202)\305B\036w\266ue\233\342sr\037\370\027\246)\227\336\276/\316\244\rM\351\232\313\362,<\347\255\017t\273\177\2716:>\037\221\365J\307sB\223F&\002\272\253\037\224\032\217\320\214!\207f\315\t\355\242\257!.\353\241\0368\351\001\026?2\203\005p\370=>T\305\352\020\372\232\rP\375\330\332i\211_\204z\236)\242\364h\373W\v\206\024\322\000\rG\272\277\017\016\311W\3375\t\365\366\242\202A|\363\352\2650\312\325\356\263\237\177na&\237\257\372\314%\331\216$%\254\v=Sg\002\257\016O\223+n\305\273\321\354\320&\325\373~\251J\027\204\360~\207}\004\333\217g|W\247Q\277\377\271\276\217\322bjk[\223\2306\265U\257\003\204\264\364g\354\323H;_\246J\321\342\232\320\312\032k\247&\231\255\227AO\202\245\266\3276\237y\306\'q\264\251\347f4\004\234\243"
