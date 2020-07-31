@@ -315,6 +315,17 @@ public class IPFSIOPlugin extends IOPlugin {
 							// Generate shared secret.
 							// secret, _ := curve.ScalarMult(x, y, priv)
 
+							// Private key is an integer (BigInteger).
+							// Public key is a point on the EC (x, y).
+							BigInteger ec_priv = ((ECPrivateKey)ec_keys.getPrivate()).getS();
+
+							System.out.println("Our EC private key\n" + ec_priv);
+							
+							ECPublicKey their_pub = SecioHelper.generateP256PublicKeyFromUncompressedW(remote_exchange.getEpubkey().toByteArray());
+							
+							System.out.println("Their EC Public key\n" + their_pub);
+
+							// Next we need to perform (their_pub * ec_priv) which will create a new ECPoint
 							
 							
 							// TODO: Key stretching
