@@ -334,6 +334,13 @@ public class SecioSession {
 		logger.info("Have initialized HMAC and ciphers");
 	}
 	
+	public void write(ByteBuffer out, ByteBuffer data) {
+		data.flip();
+		byte[] d = new byte[data.remaining()];
+		data.get(d);
+		write(out, d);
+	}
+	
 	// Write encrypted data...
 	public void write(ByteBuffer out, byte[] data) {		
 		byte[] enc_data = outgoing_cipher.update(data);
