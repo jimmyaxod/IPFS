@@ -3795,22 +3795,21 @@ public final class DHTProtos {
       descriptor;
   static {
     java.lang.String[] descriptorData = {
-      "\n\022net/axod/dht.proto\032\ngogo.proto\":\n\006Reco" +
-      "rd\022\013\n\003key\030\001 \001(\014\022\r\n\005value\030\002 \001(\014\022\024\n\014timeRe" +
-      "ceived\030\005 \001(\t\"\352\003\n\007Message\022\"\n\004type\030\001 \001(\0162\024" +
-      ".Message.MessageType\022\027\n\017clusterLevelRaw\030" +
-      "\n \001(\005\022\013\n\003key\030\002 \001(\014\022\027\n\006record\030\003 \001(\0132\007.Rec" +
-      "ord\022(\n\013closerPeers\030\010 \003(\0132\r.Message.PeerB" +
-      "\004\310\336\037\000\022*\n\rproviderPeers\030\t \003(\0132\r.Message.P" +
-      "eerB\004\310\336\037\000\032b\n\004Peer\022\036\n\002id\030\001 \001(\014B\022\332\336\037\nbyteS" +
-      "tring\310\336\037\000\022\r\n\005addrs\030\002 \003(\014\022+\n\nconnection\030\003" +
-      " \001(\0162\027.Message.ConnectionType\"i\n\013Message",
-      "Type\022\r\n\tPUT_VALUE\020\000\022\r\n\tGET_VALUE\020\001\022\020\n\014AD" +
-      "D_PROVIDER\020\002\022\021\n\rGET_PROVIDERS\020\003\022\r\n\tFIND_" +
-      "NODE\020\004\022\010\n\004PING\020\005\"W\n\016ConnectionType\022\021\n\rNO" +
-      "T_CONNECTED\020\000\022\r\n\tCONNECTED\020\001\022\017\n\013CAN_CONN" +
-      "ECT\020\002\022\022\n\016CANNOT_CONNECT\020\003B\025\n\010net.axodB\tD" +
-      "HTProtosb\006proto3"
+      "\n\022net/axod/dht.proto\":\n\006Record\022\013\n\003key\030\001 " +
+      "\001(\014\022\r\n\005value\030\002 \001(\014\022\024\n\014timeReceived\030\005 \001(\t" +
+      "\"\312\003\n\007Message\022\"\n\004type\030\001 \001(\0162\024.Message.Mes" +
+      "sageType\022\027\n\017clusterLevelRaw\030\n \001(\005\022\013\n\003key" +
+      "\030\002 \001(\014\022\027\n\006record\030\003 \001(\0132\007.Record\022\"\n\013close" +
+      "rPeers\030\010 \003(\0132\r.Message.Peer\022$\n\rproviderP" +
+      "eers\030\t \003(\0132\r.Message.Peer\032N\n\004Peer\022\n\n\002id\030" +
+      "\001 \001(\014\022\r\n\005addrs\030\002 \003(\014\022+\n\nconnection\030\003 \001(\016" +
+      "2\027.Message.ConnectionType\"i\n\013MessageType" +
+      "\022\r\n\tPUT_VALUE\020\000\022\r\n\tGET_VALUE\020\001\022\020\n\014ADD_PR",
+      "OVIDER\020\002\022\021\n\rGET_PROVIDERS\020\003\022\r\n\tFIND_NODE" +
+      "\020\004\022\010\n\004PING\020\005\"W\n\016ConnectionType\022\021\n\rNOT_CO" +
+      "NNECTED\020\000\022\r\n\tCONNECTED\020\001\022\017\n\013CAN_CONNECT\020" +
+      "\002\022\022\n\016CANNOT_CONNECT\020\003B\025\n\010net.axodB\tDHTPr" +
+      "otosb\006proto3"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
@@ -3823,7 +3822,6 @@ public final class DHTProtos {
     com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
         new com.google.protobuf.Descriptors.FileDescriptor[] {
-          com.google.protobuf.GoGoProtos.getDescriptor(),
         }, assigner);
     internal_static_Record_descriptor =
       getDescriptor().getMessageTypes().get(0);
@@ -3843,13 +3841,6 @@ public final class DHTProtos {
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_Message_Peer_descriptor,
         new java.lang.String[] { "Id", "Addrs", "Connection", });
-    com.google.protobuf.ExtensionRegistry registry =
-        com.google.protobuf.ExtensionRegistry.newInstance();
-    registry.add(com.google.protobuf.GoGoProtos.customtype);
-    registry.add(com.google.protobuf.GoGoProtos.nullable);
-    com.google.protobuf.Descriptors.FileDescriptor
-        .internalUpdateFileDescriptor(descriptor, registry);
-    com.google.protobuf.GoGoProtos.getDescriptor();
   }
 
   // @@protoc_insertion_point(outer_class_scope)

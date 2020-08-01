@@ -29,6 +29,12 @@
       <version>1.2.1</version>
     </dependency>
 
+    <dependency>
+      <groupId>com.github.multiformats</groupId>
+      <artifactId>java-multiaddr</artifactId>
+      <version>1.4.1</version>
+    </dependency>
+
 <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk15on -->
 <dependency>
     <groupId>org.bouncycastle</groupId>

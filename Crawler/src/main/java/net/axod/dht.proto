@@ -13,7 +13,7 @@ option java_outer_classname = "DHTProtos";
 //import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 //import "code.google.com/p/gogoprotobuf/gogoproto/gogo.proto";
 
-import "gogo.proto";
+//import "gogo.proto";
 
 // Record represents a dht record that contains a value
 // for a key value pair
@@ -61,7 +61,7 @@ message Message {
 
 	message Peer {
 		// ID of a given peer.
-		bytes id = 1 [(gogoproto.customtype) = "byteString", (gogoproto.nullable) = false];
+		bytes id = 1;
 
 		// multiaddrs for a given peer
 		repeated bytes addrs = 2;
@@ -87,9 +87,9 @@ message Message {
 
 	// Used to return peers closer to a key in a query
 	// GET_VALUE, GET_PROVIDERS, FIND_NODE
-	repeated Peer closerPeers = 8 [(gogoproto.nullable) = false];
+	repeated Peer closerPeers = 8;
 
 	// Used to return Providers
 	// GET_VALUE, ADD_PROVIDER, GET_PROVIDERS
-	repeated Peer providerPeers = 9 [(gogoproto.nullable) = false];
+	repeated Peer providerPeers = 9;
 }

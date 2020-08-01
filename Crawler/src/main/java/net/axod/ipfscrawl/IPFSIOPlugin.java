@@ -10,6 +10,7 @@ import net.axod.util.*;
 import com.google.protobuf.*;
 
 import io.ipfs.multihash.*;
+import io.ipfs.multiaddr.*;
 
 import java.net.*;
 import java.nio.*;
@@ -35,6 +36,8 @@ import javax.crypto.spec.*;
 public class IPFSIOPlugin extends IOPlugin {
     private static Logger logger = Logger.getLogger("net.axod.ipfscrawl");
 
+    String host = null;
+    
     // Initial multistream handshake
 	boolean handshaked = false;
 	
@@ -46,10 +49,9 @@ public class IPFSIOPlugin extends IOPlugin {
 	boolean using_yamux = false;
 	
 	boolean setup_stream_7 = false;
-	
+		
 	// My RSA keys
-	KeyPair mykeys = null;
-	
+	KeyPair mykeys = null;	
 
 	/**
 	 * Given a public key, we can get a Multihash which shows the PeerID in a
@@ -84,8 +86,12 @@ public class IPFSIOPlugin extends IOPlugin {
 	 */
 	public IPFSIOPlugin(Node n, InetSocketAddress isa) {
         in.order(ByteOrder.BIG_ENDIAN);
-        out.order(ByteOrder.BIG_ENDIAN);
-
+        out.order(ByteOrder.BIG_ENDIAN);        
+        
+        host = (String)n.properties.get("host");
+        Crawl.registerConnection(host);
+        
+        
         // TODO: Allow reusing previous keys. These should be stored and reused.
         try {
         	KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
@@ -100,10 +106,21 @@ public class IPFSIOPlugin extends IOPlugin {
         }
 	}
 
+	private long lastPingTime = 0;
+	private long PERIOD_PING = 10*1000;
+
+	private long lastQueryTime = 0;
+	private long PERIOD_QUERY = 4*1000;
+
+	private boolean on_dht = false;
+	
 	/**
 	 * Does the plugin need to send anything
 	 */
 	public boolean wantsToWork() {
+		if (on_dht && (System.currentTimeMillis() - lastPingTime > PERIOD_PING)) return true;
+
+		if (on_dht && (System.currentTimeMillis() - lastQueryTime > PERIOD_QUERY)) return true;
 		return false;	
 	}
 
@@ -128,6 +145,62 @@ public class IPFSIOPlugin extends IOPlugin {
 	 *
 	 */
 	public void work() {
+		if (on_dht && (System.currentTimeMillis() - lastPingTime > PERIOD_PING)) {
+			System.out.println("Sending a PING...");
+			int dht_stream = 7;
+
+			DHTProtos.Message msg = DHTProtos.Message.newBuilder()
+							.setType(DHTProtos.Message.MessageType.PING)
+							.build();
+
+			// OK now lets send it...
+			byte[] multi_data = msg.toByteArray();
+			ByteBuffer vo = ByteBuffer.allocate(8192);
+			Multistream.writeVarInt(vo, multi_data.length);
+			vo.put(multi_data);
+			vo.flip();
+			byte[] multi_data2 = new byte[vo.remaining()];
+			vo.get(multi_data2);
+			ByteBuffer bbo = ByteBuffer.allocate(8192);
+			Yamux.writeYamux(bbo, multi_data2, dht_stream, (short)0);
+			secio.write(out, bbo);		// Write it out...
+			
+			lastPingTime = System.currentTimeMillis();	
+		}
+
+		if (on_dht && (System.currentTimeMillis() - lastQueryTime > PERIOD_QUERY)) {
+			int dht_stream = 7;
+			byte[] digest = new byte[32];
+			for(int i=0;i<digest.length;i++) {
+				digest[i] = (byte)(Math.random()*256);	
+			}
+			
+			Multihash h = new Multihash(Multihash.Type.sha2_256, digest);														
+			
+			System.out.println("Sending a query for " + h);
+
+			DHTProtos.Message msg = DHTProtos.Message.newBuilder()
+							.setType(DHTProtos.Message.MessageType.FIND_NODE)
+							.setKey(ByteString.copyFromUtf8(h.toString()))
+							.build();
+
+			// OK now lets send it...
+			byte[] multi_data = msg.toByteArray();
+			ByteBuffer vo = ByteBuffer.allocate(8192);
+			Multistream.writeVarInt(vo, multi_data.length);
+			vo.put(multi_data);
+			vo.flip();
+			byte[] multi_data2 = new byte[vo.remaining()];
+			vo.get(multi_data2);
+			ByteBuffer bbo = ByteBuffer.allocate(8192);
+			Yamux.writeYamux(bbo, multi_data2, dht_stream, (short)0);
+			secio.write(out, bbo);		// Write it out...
+			System.out.println("Just sent a DHT PING");
+		
+			
+			lastQueryTime = System.currentTimeMillis();
+		}
+		
 		logger.fine("Work " + in);
 		
 		if (in.position()>0) {
@@ -291,6 +364,9 @@ public class IPFSIOPlugin extends IOPlugin {
 													logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
 													if (l.equals("/ipfs/kad/1.0.0\n")) {
 														setup_stream_7 = true;
+														
+														on_dht = true;
+														
 														break;
 													}
 												}
@@ -298,18 +374,44 @@ public class IPFSIOPlugin extends IOPlugin {
 											
 											if(inbuff.remaining()>0) {
 
-												System.out.println("WE HAVE KAD DATA " + inbuff.remaining());
-												
 												// Read a varint
 												int ll = (int)Multistream.readVarInt(inbuff);
 
 												byte[] idd = new byte[ll];
 												inbuff.get(idd);
+
+												DHTProtos.Message msg = DHTProtos.Message.parseFrom(idd);
 												
-												showHexData(idd);
+//												System.out.println("-> KAD PACKET " + msg);
 												
-												//IPFSProtos.Identify id = IPFSProtos.Identify.parseFrom(idd);
-												//System.out.println("=== THEIR ID ===\n" + id);
+												// Now we need to parse out closerPeers
+												
+												Iterator i = msg.getCloserPeersList().iterator();
+												while(i.hasNext()) {
+													DHTProtos.Message.Peer closer = (DHTProtos.Message.Peer)i.next();
+													Multihash id = new Multihash(closer.getId().toByteArray());
+													System.out.println("PEER " + id);
+													
+													// Parse the addrs, and see if we can connect to anything...
+													Iterator j = closer.getAddrsList().iterator();
+													while(j.hasNext()) {
+														byte[] a = ((ByteString)j.next()).toByteArray();
+														try {
+															MultiAddress ma = new MultiAddress(a);
+															System.out.println(" : " + ma);
+															long now = System.currentTimeMillis();
+															Crawl.outputs.writeFile("peers", now + "," + id + "," + ma + "\n");
+															
+															// For now...
+															Crawl.addConnection(ma);
+															
+															
+														} catch(Exception e) {
+															// Don't care!	
+														}
+														// TODO: Now connect to those ones etc etc
+													}
+												}
 											}
 										} else {
 										
@@ -391,6 +493,7 @@ public class IPFSIOPlugin extends IOPlugin {
 	
 	public void closing() {
 		logger.info("Connection closing...");
+        Crawl.unregisterConnection(host);
 	}
 
 	private static void showHexData(byte[] d) {
