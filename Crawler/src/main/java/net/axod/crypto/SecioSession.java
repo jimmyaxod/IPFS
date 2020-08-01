@@ -7,8 +7,11 @@ import com.google.protobuf.*;
 
 import io.ipfs.multihash.*;
 
+import java.util.logging.*;
 import java.security.*;
 import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
 
 
 /**
@@ -18,6 +21,7 @@ import java.security.spec.*;
  *
  */
 public class SecioSession {
+    private static Logger logger = Logger.getLogger("net.axod.crypto");
 
 	public boolean we_are_primary = true;
 	
@@ -26,6 +30,16 @@ public class SecioSession {
 	public SecioProtos.Exchange local_exchange = null;
 	public SecioProtos.Exchange remote_exchange = null;
 
+	public Mac incoming_HMAC;
+	public Mac outgoing_HMAC;
+	
+	public Cipher incoming_cipher;
+	public Cipher outgoing_cipher;
+
+	// The EC keys
+	public KeyPair ec_keys = null;
+
+	
 	/**
 	 *
 	 * Create a new session
@@ -74,6 +88,27 @@ public class SecioSession {
 		}
 	}
 	
+	public void createLocalExchange(PrivateKey privk) throws Exception {
+		// First we need to create EC keypair
+		// Second we need to create a signature
+		KeyPairGenerator keyGen = KeyPairGenerator.getInstance("EC");
+        SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+        keyGen.initialize(256, random);
+        ec_keys = keyGen.generateKeyPair();
+		
+		// Encode the pubkey as required...
+		byte[] ec_pubkey = SecioHelper.getECPublicKey(ec_keys);
+		
+		// Now create the signature...
+		byte[] signature = SecioHelper.sign(privk, local_propose.toByteArray(), remote_propose.toByteArray(), ec_pubkey);
+		
+		// TODO: Send out our exchange...
+		local_exchange = SecioProtos.Exchange.newBuilder()
+						.setEpubkey(ByteString.copyFrom(ec_pubkey))
+						.setSignature(ByteString.copyFrom(signature))
+						.build();		
+	}
+	
 	public void createLocalPropose(byte[] publickey, String exchanges, String ciphers, String hashes) {
 		// Create our own random nonce...
 		byte[] orand = new byte[16];
@@ -114,5 +149,112 @@ public class SecioSession {
 		verify.update(local_propose.toByteArray());
 		verify.update(remote_exchange.getEpubkey().toByteArray());
 		return verify.verify(remote_exchange.getSignature().toByteArray());		
+	}
+	
+	/**
+	 * Initialize ciphers and macs
+	 *
+	 */
+	public void initCiphersMacs(byte[] ss) throws Exception {
+		String cipher = "AES-256";
+		String hasher = "SHA256";
+				
+		int iv_size = 16;
+		int key_size = 16;		// AES-128 is 16, AES-256 is 32
+		if (cipher.equals("AES-128")) key_size = 16;
+		if (cipher.equals("AES-256")) key_size = 32;
+		int mac_size = 20;
+
+		byte[] seed = "key expansion".getBytes();
+		
+		byte[] stretched_keys = new byte[(iv_size + key_size + mac_size) * 2];
+
+		// Need to strip off any leading 0s, because of stupid go.
+		int soffset = 0;
+		while(soffset<ss.length && ss[soffset]==0) soffset++;
+		byte[] ss_z = new byte[ss.length - soffset];
+		System.arraycopy(ss, soffset, ss_z, 0, ss_z.length);
+		
+		Mac sha_HMAC = Mac.getInstance("Hmac" + hasher);
+		SecretKeySpec secret_key = new SecretKeySpec(ss_z, "Hmac" + hasher);
+		sha_HMAC.init(secret_key);
+		byte[] idig = sha_HMAC.doFinal(seed);
+			
+		// Now go through...
+		int j = 0;
+		while(j<stretched_keys.length) {
+			sha_HMAC.init(secret_key);
+			sha_HMAC.update(idig);
+			byte[] idigb = sha_HMAC.doFinal(seed);
+
+			// Write it out and continue...
+			int todo = idigb.length;
+			if (j + todo > stretched_keys.length) {
+				todo = stretched_keys.length - j;	
+			}
+			System.arraycopy(idigb, 0, stretched_keys, j, todo);
+			j+=todo;
+			// Now update idig...
+			sha_HMAC.init(secret_key);
+			idig = sha_HMAC.doFinal(idig);
+		}
+		
+		// stretched_keys has 2 sets of keys in...
+		//
+		
+		int offset = 0;
+		byte[] iv1 = new byte[iv_size];
+		System.arraycopy(stretched_keys, offset, iv1, 0, iv_size);
+		offset+=iv_size;
+		byte[] key1 = new byte[key_size];
+		System.arraycopy(stretched_keys, offset, key1, 0, key_size);
+		offset+=key_size;
+		byte[] mac1 = new byte[mac_size];
+		System.arraycopy(stretched_keys, offset, mac1, 0, mac_size);
+		offset+=mac_size;
+		
+		byte[] iv2 = new byte[iv_size];
+		System.arraycopy(stretched_keys, offset, iv2, 0, iv_size);
+		offset+=iv_size;
+		byte[] key2 = new byte[key_size];
+		System.arraycopy(stretched_keys, offset, key2, 0, key_size);
+		offset+=key_size;
+		byte[] mac2 = new byte[mac_size];
+		System.arraycopy(stretched_keys, offset, mac2, 0, mac_size);
+		offset+=mac_size;
+		
+		byte[] liv;
+		byte[] lkey;
+		byte[] lmac;
+		byte[] riv;
+		byte[] rkey;
+		byte[] rmac;
+
+		if (we_are_primary) {
+			liv = iv1;
+			lkey = key1;
+			lmac = mac1;
+			riv = iv2;
+			rkey = key2;
+			rmac = mac2;
+		} else {
+			riv = iv1;
+			rkey = key1;
+			rmac = mac1;
+			liv = iv2;
+			lkey = key2;
+			lmac = mac2;
+		}
+
+		incoming_HMAC = Mac.getInstance("Hmac" + hasher);
+		incoming_HMAC.init(new SecretKeySpec(rmac, "Hmac" + hasher));
+		outgoing_HMAC = Mac.getInstance("Hmac" + hasher);
+		outgoing_HMAC.init(new SecretKeySpec(lmac, "Hmac" + hasher));
+
+		incoming_cipher = Cipher.getInstance("AES/CTR/NoPadding");
+		incoming_cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(rkey, "AES"), new IvParameterSpec(riv));
+		outgoing_cipher = Cipher.getInstance("AES/CTR/NoPadding");
+		outgoing_cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(lkey, "AES"), new IvParameterSpec(liv));
+		logger.info("Have initialized HMAC and ciphers");
 	}
 }

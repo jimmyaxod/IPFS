@@ -44,13 +44,7 @@ public class IPFSIOPlugin extends IOPlugin {
 
 	// This handles a SECIO session
 	SecioSession secio = new SecioSession();
-	
-	Mac incoming_HMAC;
-	Mac outgoing_HMAC;
-	
-	Cipher incoming_cipher;
-	Cipher outgoing_cipher;
-	
+		
 	boolean got_enc_nonce = false;
 	
 	boolean got_enc_multistream = false;
@@ -61,11 +55,7 @@ public class IPFSIOPlugin extends IOPlugin {
 	// My RSA keys
 	KeyPair mykeys = null;
 	
-	// The EC keys
-	KeyPair ec_keys = null;
 
-	byte[] stretched_keys = null;
-	
 	/**
 	 * Given a public key, we can get a Multihash which shows the PeerID in a
 	 * more usable format.
@@ -146,8 +136,8 @@ public class IPFSIOPlugin extends IOPlugin {
 	
 	// Write encrypted data...
 	private void writeEnc(byte[] data) {		
-		byte[] enc_data = outgoing_cipher.update(data);
-		byte[] mac_data = outgoing_HMAC.doFinal(enc_data);
+		byte[] enc_data = secio.outgoing_cipher.update(data);
+		byte[] mac_data = secio.outgoing_HMAC.doFinal(enc_data);
 		
 		out.putInt(enc_data.length + mac_data.length);
 		out.put(enc_data);
@@ -223,7 +213,6 @@ public class IPFSIOPlugin extends IOPlugin {
 						} else if (!got_exchange) {
 							//
 							// Now we have done the Propose, lets decide the order, and then we can decide on exchange, ciphers, hashes etc
-							
 							secio.decideOrder();
 
 							logger.info("we_are_primary = " + secio.we_are_primary);
@@ -248,32 +237,17 @@ public class IPFSIOPlugin extends IOPlugin {
 								return;
 							}
 
-							// First we need to create EC keypair
-							// Second we need to create a signature
-							ec_keys = SecioHelper.createECKeypair();
-							
-							// Encode the pubkey as required...
-							byte[] ec_pubkey = SecioHelper.getECPublicKey(ec_keys);
-							
-							// Now create the signature...
-							byte[] signature = SecioHelper.sign(mykeys.getPrivate(), secio.local_propose.toByteArray(), secio.remote_propose.toByteArray(), ec_pubkey);
-							
-							// TODO: Send out our exchange...
-							secio.local_exchange = SecioProtos.Exchange.newBuilder()
-											.setEpubkey(ByteString.copyFrom(ec_pubkey))
-											.setSignature(ByteString.copyFrom(signature))
-											.build();
+							secio.createLocalExchange(mykeys.getPrivate());							
 
 							byte[] odata = secio.local_exchange.toByteArray();
-	
 							logger.info("Secio local exchange\n" + secio.local_exchange);							
 							out.putInt(odata.length);
 							out.put(odata);
-							
+
 							got_exchange = true;
 							
 							
-							BigInteger ec_priv = ((ECPrivateKey)ec_keys.getPrivate()).getS();
+							BigInteger ec_priv = ((ECPrivateKey)secio.ec_keys.getPrivate()).getS();
 
 							System.out.println("Our EC private key\n" + ec_priv);
 							
@@ -292,23 +266,14 @@ public class IPFSIOPlugin extends IOPlugin {
 
 							byte[] ss = new byte[32];
 							System.arraycopy(ass, 1, ss, 0, 32);		// Try the first 32 bytes for now...
-
-							// For P-256, the shared secret should be 32 bytes...
-/*
-  PubKey256Length* = 65
-  PubKey384Length* = 97
-  PubKey521Length* = 133
-  SecKey256Length* = 32
-  SecKey384Length* = 48
-  SecKey521Length* = 66
-  Sig256Length* = 64
-  Sig384Length* = 96
-  Sig521Length* = 132
-  Secret256Length* = SecKey256Length
-  Secret384Length* = SecKey384Length
-  Secret521Length* = SecKey521Length
-*/
+							// For key256, it's 32 bytes
+							// For key384, it's 48 bytes
+							// For key521, it's 66 bytes
 							
+							// For P-256, the shared secret should be 32 bytes...
+							
+							secio.initCiphersMacs(ss);
+							/*
 							// TODO: Key stretching
 
 							stretched_keys = SecioHelper.stretchKeys(ss, "AES-256", "SHA256");
@@ -342,17 +307,17 @@ public class IPFSIOPlugin extends IOPlugin {
 								lmac = keys[5];
 							}
 
-							incoming_HMAC = Mac.getInstance("HmacSHA256");
-							incoming_HMAC.init(new SecretKeySpec(rmac, "HmacSHA256"));
-							outgoing_HMAC = Mac.getInstance("HmacSHA256");
-							outgoing_HMAC.init(new SecretKeySpec(lmac, "HmacSHA256"));
+							secio.incoming_HMAC = Mac.getInstance("HmacSHA256");
+							secio.incoming_HMAC.init(new SecretKeySpec(rmac, "HmacSHA256"));
+							secio.outgoing_HMAC = Mac.getInstance("HmacSHA256");
+							secio.outgoing_HMAC.init(new SecretKeySpec(lmac, "HmacSHA256"));
 
-        					incoming_cipher = Cipher.getInstance("AES/CTR/NoPadding");
-        					incoming_cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(rkey, "AES"), new IvParameterSpec(riv));
-        					outgoing_cipher = Cipher.getInstance("AES/CTR/NoPadding");
-        					outgoing_cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(lkey, "AES"), new IvParameterSpec(liv));
+        					secio.incoming_cipher = Cipher.getInstance("AES/CTR/NoPadding");
+        					secio.incoming_cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(rkey, "AES"), new IvParameterSpec(riv));
+        					secio.outgoing_cipher = Cipher.getInstance("AES/CTR/NoPadding");
+        					secio.outgoing_cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(lkey, "AES"), new IvParameterSpec(liv));
         					logger.info("Have initialized HMAC and ciphers");
-        					
+        					*/
 						} else {
 							System.out.println("Secio DATA " + data.length);
 							showHexData(data);
@@ -363,14 +328,14 @@ public class IPFSIOPlugin extends IOPlugin {
         					byte[] datanomac = new byte[data.length - 32];
         					System.arraycopy(data, 0, datanomac, 0, datanomac.length);
 
-							byte[] sign = incoming_HMAC.doFinal(datanomac);
+							byte[] sign = secio.incoming_HMAC.doFinal(datanomac);
 							boolean verifies = SecioHelper.toHexString(sign).equals(SecioHelper.toHexString(mac));
 							if (!verifies) {
 								logger.warning("Incorrect MAC!");
 							}
 							
 							System.out.println("\n==== Decryption ====\n");
-        					byte[] plainText = incoming_cipher.update(datanomac);
+        					byte[] plainText = secio.incoming_cipher.update(datanomac);
 
         					System.out.println("RAW DATA " + (verifies?"Verifies":"DOES NOT VERIFY"));
 							showHexData(plainText);
@@ -383,8 +348,8 @@ public class IPFSIOPlugin extends IOPlugin {
 
 								// Now we will send our own...
 								
-								byte[] enc_data = outgoing_cipher.update(secio.remote_propose.getRand().toByteArray());
-								byte[] mac_data = outgoing_HMAC.doFinal(enc_data);
+								byte[] enc_data = secio.outgoing_cipher.update(secio.remote_propose.getRand().toByteArray());
+								byte[] mac_data = secio.outgoing_HMAC.doFinal(enc_data);
 								
 								out.putInt(enc_data.length + mac_data.length);
 								out.put(enc_data);
