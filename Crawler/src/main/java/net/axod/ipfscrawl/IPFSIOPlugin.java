@@ -38,13 +38,9 @@ public class IPFSIOPlugin extends IOPlugin {
     // Initial multistream handshake
 	boolean handshaked = false;
 	
-	// Have we got propose / exchange messages yet?
-	boolean got_propose = false;
-	boolean got_exchange = false;
-
 	// This handles a SECIO session
 	SecioSession secio = new SecioSession();
-		
+
 	boolean got_enc_nonce = false;
 	
 	boolean got_enc_multistream = false;
@@ -127,23 +123,10 @@ public class IPFSIOPlugin extends IOPlugin {
 	private void writeEnc(ByteBuffer bb) {
 		bb.flip();
 		byte[] data = new byte[bb.remaining()];
-		bb.get(data);
-//		System.out.println("WRITING ENCRYPTED...");
-//		showHexData(data);
-		
-		writeEnc(data);
+		bb.get(data);		
+		secio.write(out, data);
 	}
-	
-	// Write encrypted data...
-	private void writeEnc(byte[] data) {		
-		byte[] enc_data = secio.outgoing_cipher.update(data);
-		byte[] mac_data = secio.outgoing_HMAC.doFinal(enc_data);
-		
-		out.putInt(enc_data.length + mac_data.length);
-		out.put(enc_data);
-		out.put(mac_data);	
-	}
-		
+
 	/**
 	 * Main work method.
 	 *
@@ -153,14 +136,12 @@ public class IPFSIOPlugin extends IOPlugin {
 		
 		if (in.position()>0) {
 			if (!handshaked) {
-				// We haven't performed the multistream handshake yet, so we should
-				// do that now.
+				// We haven't performed the multistream handshake yet, so we should do that now.
 				in.flip();
 				
 				// Try to read a complete packet. If we can't we abort.
-				
 				try {
-					String l = Multistream.readMultistream(in);					
+					String l = Multistream.readMultistream(in);	
 					logger.info("Multistream handshake (" + l.trim() + ")");
 
 					// For now, we only support multistream/1.0.0
@@ -168,7 +149,7 @@ public class IPFSIOPlugin extends IOPlugin {
 						// OK, as expected, lets reply and progress...
 						Multistream.writeMultistream(out, "/multistream/1.0.0\n");						
 						Multistream.writeMultistream(out, "/secio/1.0.0\n");
-						
+
 					// For now, we only support secio/1.0.0
 					} else if (l.equals("/secio/1.0.0\n")) {
 						// OK, need to move on to next stage now...
@@ -194,7 +175,7 @@ public class IPFSIOPlugin extends IOPlugin {
 						byte[] data = new byte[len];
 						in.get(data);
 						
-						if (!got_propose) {							
+						if (secio.remote_propose == null) {							
 							secio.remote_propose = SecioProtos.Propose.parseFrom(data);
 							logger.info("Secio remote propose\n" + secio.remote_propose + "\n");
 	
@@ -209,8 +190,7 @@ public class IPFSIOPlugin extends IOPlugin {
 							out.putInt(odata.length);
 							out.put(odata);
 
-							got_propose = true;
-						} else if (!got_exchange) {
+						} else if (secio.remote_exchange == null) {
 							//
 							// Now we have done the Propose, lets decide the order, and then we can decide on exchange, ciphers, hashes etc
 							secio.decideOrder();
@@ -244,8 +224,6 @@ public class IPFSIOPlugin extends IOPlugin {
 							out.putInt(odata.length);
 							out.put(odata);
 
-							got_exchange = true;
-														
 							secio.initCiphersMacs();
 
 						} else {
@@ -427,19 +405,10 @@ public class IPFSIOPlugin extends IOPlugin {
 		}
 	}
 	
-/*
-RAW DATA Verifies
-  5a 6e ca e5 78 08 5f 82 26 24 bd cb 50 84 c3 1d
-  9f 42 fb 34
-	
-RAW DATA Verifies
-  64 02 37 3e ff ff e6 82 56 09 4c 51 73 f6 16 b2
-  0e be 9a 59
-*/
 	public void closing() {
 		logger.info("Connection closing...");
 	}
-	
+
 	private static void showHexData(byte[] d) {
 		int o = 0;
 		while(true) {

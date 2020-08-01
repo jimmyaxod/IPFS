@@ -7,6 +7,7 @@ import com.google.protobuf.*;
 import io.ipfs.multihash.*;
 
 import java.math.*;
+import java.nio.*;
 import java.util.*;
 import java.util.logging.*;
 import java.security.*;
@@ -330,4 +331,15 @@ public class SecioSession {
 		outgoing_cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(lkey, "AES"), new IvParameterSpec(liv));
 		logger.info("Have initialized HMAC and ciphers");
 	}
+	
+	// Write encrypted data...
+	public void write(ByteBuffer out, byte[] data) {		
+		byte[] enc_data = outgoing_cipher.update(data);
+		byte[] mac_data = outgoing_HMAC.doFinal(enc_data);
+		
+		out.putInt(enc_data.length + mac_data.length);
+		out.put(enc_data);
+		out.put(mac_data);	
+	}
+
 }
