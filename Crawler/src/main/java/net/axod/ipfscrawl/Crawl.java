@@ -75,6 +75,7 @@ public class Crawl {
 		if (!ma.isTCPIP()) return;
 		try {
 			String host = ma.getHost();
+			if (host.indexOf(":")!=-1) return;	// Don't care about ipv6 for now
 			int port = ma.getTCPPort();
 			
 			if (currentConnectedHosts.contains(host)) {
