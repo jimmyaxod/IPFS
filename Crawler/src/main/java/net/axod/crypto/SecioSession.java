@@ -42,6 +42,8 @@ public class SecioSession {
 	// The EC keys
 	public KeyPair ec_keys = null;
 
+	// Final secio handshake verifying our nonces
+	public boolean got_enc_nonce = false;
 	
 	/**
 	 *

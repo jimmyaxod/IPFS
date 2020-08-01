@@ -41,7 +41,6 @@ public class IPFSIOPlugin extends IOPlugin {
 	// This handles a SECIO session
 	SecioSession secio = new SecioSession();
 
-	boolean got_enc_nonce = false;
 	
 	boolean got_enc_multistream = false;
 	boolean using_yamux = false;
@@ -135,6 +134,8 @@ public class IPFSIOPlugin extends IOPlugin {
 		logger.fine("Work " + in);
 		
 		if (in.position()>0) {
+			
+			// ======== Multistream handshake ==================================
 			if (!handshaked) {
 				// We haven't performed the multistream handshake yet, so we should do that now.
 				in.flip();
@@ -142,7 +143,7 @@ public class IPFSIOPlugin extends IOPlugin {
 				// Try to read a complete packet. If we can't we abort.
 				try {
 					String l = Multistream.readMultistream(in);	
-					logger.info("Multistream handshake (" + l.trim() + ")");
+					logger.fine("Multistream handshake (" + l.trim() + ")");
 
 					// For now, we only support multistream/1.0.0
 					if (l.equals("/multistream/1.0.0\n")) {
@@ -155,14 +156,13 @@ public class IPFSIOPlugin extends IOPlugin {
 						// OK, need to move on to next stage now...
 						handshaked = true;
 					}
-				} catch(Exception e) {
-					logger.warning("Issue reading... " + e);
-					in.rewind();	// Unread it all... We'll try again later...	
+				} catch(BufferUnderflowException bue) {
+					in.rewind();	// Partial packet. We'll try and read again later...
 				}
 				in.compact();
 			}
-			
-			// Now lets do SECIO
+
+			// ======== SECIO layer ============================================
 			if (handshaked) {
 				in.flip();
 				while(in.remaining()>0) {
@@ -170,103 +170,82 @@ public class IPFSIOPlugin extends IOPlugin {
 						int len = in.getInt();		// Length is 32bit int
 						if (len>8000000) {
 							logger.warning("Got a packet of >8MB?");
-							break;
+							close();
+							return;
 						}
 						byte[] data = new byte[len];
 						in.get(data);
 						
 						if (secio.remote_propose == null) {							
 							secio.remote_propose = SecioProtos.Propose.parseFrom(data);
-							logger.info("Secio remote propose\n" + secio.remote_propose + "\n");
+							logger.fine("Secio remote propose\n" + secio.remote_propose + "\n");
 	
 							byte[] pubkey = secio.remote_propose.getPubkey().toByteArray();
 							PeerKeyProtos.PublicKey pk = PeerKeyProtos.PublicKey.parseFrom(pubkey);
 							logger.info("Secio remote peerID " + getPeerID(pubkey));
 
 							secio.createLocalPropose(mykeys.getPublic().getEncoded(), "P-256", "AES-256", "SHA256");							
-							byte[] odata = secio.local_propose.toByteArray();
+							logger.fine("Secio local propose\n" + secio.local_propose);							
 
-							logger.info("Secio local propose\n" + secio.local_propose);							
+							byte[] odata = secio.local_propose.toByteArray();
 							out.putInt(odata.length);
 							out.put(odata);
-
 						} else if (secio.remote_exchange == null) {
 							//
 							// Now we have done the Propose, lets decide the order, and then we can decide on exchange, ciphers, hashes etc
 							secio.decideOrder();
 
-							logger.info("we_are_primary = " + secio.we_are_primary);
-							
 							// Now we're expecting an Exchange...
 							secio.remote_exchange = SecioProtos.Exchange.parseFrom(data);
+							logger.fine("Secio remote exchange\n" + secio.remote_exchange + "\n");
 
-							logger.info("Secio remote exchange\n" + secio.remote_exchange + "\n");
-
-							try {
-								boolean verified = secio.checkSignature();
-								
-								System.out.println("Secio remote checking signature... [" + (verified?"correct":"incorrect") + "]");
-								if (!verified) {
-									close();
-									return;
-								}
-							} catch(Exception ve) {
-								logger.warning("Can't verify " + ve);	
-								ve.printStackTrace();
+							if (!secio.checkSignature()) {
+								logger.warning("Secio signature did not validate!");
 								close();
 								return;
 							}
 
 							secio.createLocalExchange(mykeys.getPrivate());							
+							logger.fine("Secio local exchange\n" + secio.local_exchange);
 
 							byte[] odata = secio.local_exchange.toByteArray();
-							logger.info("Secio local exchange\n" + secio.local_exchange);							
 							out.putInt(odata.length);
 							out.put(odata);
 
 							secio.initCiphersMacs();
-
 						} else {
-							System.out.println("Secio DATA " + data.length);
-							showHexData(data);
-
-							// First split off the mac. For now assume 32 bytes
-        					byte[] mac = new byte[32];
+							
+							// First split off the mac, verify that's correct
+							int maclen = secio.incoming_HMAC.getMacLength();
+        					byte[] mac = new byte[maclen];
         					System.arraycopy(data, data.length - mac.length, mac, 0, mac.length);        					
-        					byte[] datanomac = new byte[data.length - 32];
+        					byte[] datanomac = new byte[data.length - mac.length];
         					System.arraycopy(data, 0, datanomac, 0, datanomac.length);
-
 							byte[] sign = secio.incoming_HMAC.doFinal(datanomac);
 							boolean verifies = ByteUtil.toHexString(sign).equals(ByteUtil.toHexString(mac));
 							if (!verifies) {
 								logger.warning("Incorrect MAC!");
-							}
-							
-							System.out.println("\n==== Decryption ====\n");
+								close();
+								return;
+							}							
         					byte[] plainText = secio.incoming_cipher.update(datanomac);
 
-        					System.out.println("RAW DATA " + (verifies?"Verifies":"DOES NOT VERIFY"));
-							showHexData(plainText);
-							
-							if (!got_enc_nonce) {
+							if (!secio.got_enc_nonce) {
 								// check it matches...
-								if (ByteUtil.toHexString(plainText).equals(ByteUtil.toHexString(secio.local_propose.getRand().toByteArray()))) {
-									logger.info("The decrypted nonce matches");	
+								if (!ByteUtil.toHexString(plainText).equals(ByteUtil.toHexString(secio.local_propose.getRand().toByteArray()))) {
+									logger.warning("The decrypted nonce does NOT match");
+									close();
+									return;
 								}
 
 								// Now we will send our own...
+								secio.write(out, secio.remote_propose.getRand().toByteArray());
+								logger.fine("Sent our encrypted signed nonce");
 								
-								byte[] enc_data = secio.outgoing_cipher.update(secio.remote_propose.getRand().toByteArray());
-								byte[] mac_data = secio.outgoing_HMAC.doFinal(enc_data);
-								
-								out.putInt(enc_data.length + mac_data.length);
-								out.put(enc_data);
-								out.put(mac_data);
-
-								logger.info("Sent our encrypted signed nonce");
-								
-								got_enc_nonce = true;
+								secio.got_enc_nonce = true;
 							} else {
+								System.out.println("-- RAW DATA --");
+								showHexData(plainText);
 
 								if (!using_yamux) {
 									ByteBuffer inbuff = ByteBuffer.wrap(plainText);
