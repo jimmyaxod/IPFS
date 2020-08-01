@@ -1,15 +1,17 @@
 package net.axod.crypto;
 
 import net.axod.*;
-import net.axod.protocols.*;
 
 import com.google.protobuf.*;
 
 import io.ipfs.multihash.*;
 
+import java.math.*;
+import java.util.*;
 import java.util.logging.*;
 import java.security.*;
 import java.security.spec.*;
+import java.security.interfaces.*;
 import javax.crypto.*;
 import javax.crypto.spec.*;
 
@@ -97,12 +99,25 @@ public class SecioSession {
         ec_keys = keyGen.generateKeyPair();
 		
 		// Encode the pubkey as required...
-		byte[] ec_pubkey = SecioHelper.getECPublicKey(ec_keys);
+        byte[] pubk = ec_keys.getPublic().getEncoded();
+
+        // Try extracting what we need to go into the packet...
+		byte[] ec_pubkey = new byte[65];
+		ec_pubkey[0] = 4;
+		System.arraycopy(pubk, pubk.length - 64, ec_pubkey, 1, 64);
 		
 		// Now create the signature...
-		byte[] signature = SecioHelper.sign(privk, local_propose.toByteArray(), remote_propose.toByteArray(), ec_pubkey);
+
+		// TODO: Do we need to support others?
+		Signature sign = Signature.getInstance("SHA256withRSA");
+
+		sign.initSign(privk);
+		sign.update(local_propose.toByteArray());
+		sign.update(remote_propose.toByteArray());
+		sign.update(ec_pubkey);
 		
-		// TODO: Send out our exchange...
+		byte[] signature = sign.sign();
+		
 		local_exchange = SecioProtos.Exchange.newBuilder()
 						.setEpubkey(ByteString.copyFrom(ec_pubkey))
 						.setSignature(ByteString.copyFrom(signature))
@@ -152,13 +167,71 @@ public class SecioSession {
 	}
 	
 	/**
+	 * Converts an uncompressed secp256r1 / P-256 public point to the EC public key it is representing.
+	 * @param w a 64 byte uncompressed EC point starting with <code>04</code>
+	 * @return an <code>ECPublicKey</code> that the point represents 
+	 */
+	public static ECPublicKey generateP256PublicKeyFromUncompressedW(byte[] w) throws InvalidKeySpecException {
+		if (w[0] != 0x04) {
+			throw new InvalidKeySpecException("w is not an uncompressed key");
+		}
+		return generateP256PublicKeyFromFlatW(Arrays.copyOfRange(w, 1, w.length));
+	}
+	
+	private static byte[] P256_HEAD = Base64.getDecoder().decode("MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE");
+	//MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE		// 36 characters in base64
+	//MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEBnW6EfMLgy0/pPiL2xSwD3ygbmNI6eNtf/dsxPzpAUuoCTVs469GcJaWnV9WMkBcEfJcL9GpBihQ7qiR+n5uPw==
+	
+	/**
+	 * Converts an uncompressed secp256r1 / P-256 public point to the EC public key it is representing.
+	 * @param w a 64 byte uncompressed EC point consisting of just a 256-bit X and Y
+	 * @return an <code>ECPublicKey</code> that the point represents 
+	 */
+	public static ECPublicKey generateP256PublicKeyFromFlatW(byte[] w) throws InvalidKeySpecException {
+		byte[] encodedKey = new byte[P256_HEAD.length + w.length];
+		System.arraycopy(P256_HEAD, 0, encodedKey, 0, P256_HEAD.length);
+		System.arraycopy(w, 0, encodedKey, P256_HEAD.length, w.length);
+		KeyFactory eckf;
+		try {
+			eckf = KeyFactory.getInstance("EC");
+		} catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException("EC key factory not present in runtime");
+		}
+		X509EncodedKeySpec ecpks = new X509EncodedKeySpec(encodedKey);
+		return (ECPublicKey) eckf.generatePublic(ecpks);
+	}
+	
+	/**
 	 * Initialize ciphers and macs
 	 *
 	 */
-	public void initCiphersMacs(byte[] ss) throws Exception {
+	public void initCiphersMacs() throws Exception {
 		String cipher = "AES-256";
 		String hasher = "SHA256";
-				
+		
+		BigInteger ec_priv = ((ECPrivateKey)ec_keys.getPrivate()).getS();
+
+		ECPublicKey their_pub = generateP256PublicKeyFromUncompressedW(remote_exchange.getEpubkey().toByteArray());
+
+		// Next we need to perform (their_pub * ec_priv) which will create a new ECPoint
+
+		org.bouncycastle.asn1.x9.X9ECParameters ecp = org.bouncycastle.asn1.sec.SECNamedCurves.getByName("secp256r1");
+		org.bouncycastle.math.ec.ECCurve curve = ecp.getCurve();
+		org.bouncycastle.math.ec.ECPoint p = curve.decodePoint(remote_exchange.getEpubkey().toByteArray());
+							
+		org.bouncycastle.math.ec.ECPoint q = p.multiply(ec_priv);
+		byte[] ass = q.getEncoded(false);
+
+		byte[] ss = new byte[32];
+		System.arraycopy(ass, 1, ss, 0, 32);		// Try the first 32 bytes for now...
+							// For key256, it's 32 bytes
+							// For key384, it's 48 bytes
+							// For key521, it's 66 bytes
+							
+							// For P-256, the shared secret should be 32 bytes...
+
+		//
+		
 		int iv_size = 16;
 		int key_size = 16;		// AES-128 is 16, AES-256 is 32
 		if (cipher.equals("AES-128")) key_size = 16;

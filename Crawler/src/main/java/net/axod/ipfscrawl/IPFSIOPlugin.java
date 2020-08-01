@@ -245,79 +245,9 @@ public class IPFSIOPlugin extends IOPlugin {
 							out.put(odata);
 
 							got_exchange = true;
-							
-							
-							BigInteger ec_priv = ((ECPrivateKey)secio.ec_keys.getPrivate()).getS();
+														
+							secio.initCiphersMacs();
 
-							System.out.println("Our EC private key\n" + ec_priv);
-							
-							ECPublicKey their_pub = SecioHelper.generateP256PublicKeyFromUncompressedW(secio.remote_exchange.getEpubkey().toByteArray());
-							
-							System.out.println("Their EC Public key\n" + their_pub);
-
-							// Next we need to perform (their_pub * ec_priv) which will create a new ECPoint
-
-							org.bouncycastle.asn1.x9.X9ECParameters ecp = org.bouncycastle.asn1.sec.SECNamedCurves.getByName("secp256r1");
-							org.bouncycastle.math.ec.ECCurve curve = ecp.getCurve();
-							org.bouncycastle.math.ec.ECPoint p = curve.decodePoint(secio.remote_exchange.getEpubkey().toByteArray());
-							
-							org.bouncycastle.math.ec.ECPoint q = p.multiply(ec_priv);
-							byte[] ass = q.getEncoded(false);
-
-							byte[] ss = new byte[32];
-							System.arraycopy(ass, 1, ss, 0, 32);		// Try the first 32 bytes for now...
-							// For key256, it's 32 bytes
-							// For key384, it's 48 bytes
-							// For key521, it's 66 bytes
-							
-							// For P-256, the shared secret should be 32 bytes...
-							
-							secio.initCiphersMacs(ss);
-							/*
-							// TODO: Key stretching
-
-							stretched_keys = SecioHelper.stretchKeys(ss, "AES-256", "SHA256");
-
-							// Now, we should be able to use this to proceed...
-							
-							// stretched_keys has 2 sets of keys in...
-							// 
-							byte[][] keys = SecioHelper.splitStretchedKeys(stretched_keys, "AES-256", "SHA256");
-
-							byte[] liv;
-							byte[] lkey;
-							byte[] lmac;
-							byte[] riv;
-							byte[] rkey;
-							byte[] rmac;
-
-							if (secio.we_are_primary) {
-								liv = keys[0];
-								lkey = keys[1];
-								lmac = keys[2];
-								riv = keys[3];
-								rkey = keys[4];
-								rmac = keys[5];
-							} else {
-								riv = keys[0];
-								rkey = keys[1];
-								rmac = keys[2];
-								liv = keys[3];
-								lkey = keys[4];
-								lmac = keys[5];
-							}
-
-							secio.incoming_HMAC = Mac.getInstance("HmacSHA256");
-							secio.incoming_HMAC.init(new SecretKeySpec(rmac, "HmacSHA256"));
-							secio.outgoing_HMAC = Mac.getInstance("HmacSHA256");
-							secio.outgoing_HMAC.init(new SecretKeySpec(lmac, "HmacSHA256"));
-
-        					secio.incoming_cipher = Cipher.getInstance("AES/CTR/NoPadding");
-        					secio.incoming_cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(rkey, "AES"), new IvParameterSpec(riv));
-        					secio.outgoing_cipher = Cipher.getInstance("AES/CTR/NoPadding");
-        					secio.outgoing_cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(lkey, "AES"), new IvParameterSpec(liv));
-        					logger.info("Have initialized HMAC and ciphers");
-        					*/
 						} else {
 							System.out.println("Secio DATA " + data.length);
 							showHexData(data);
@@ -329,7 +259,7 @@ public class IPFSIOPlugin extends IOPlugin {
         					System.arraycopy(data, 0, datanomac, 0, datanomac.length);
 
 							byte[] sign = secio.incoming_HMAC.doFinal(datanomac);
-							boolean verifies = SecioHelper.toHexString(sign).equals(SecioHelper.toHexString(mac));
+							boolean verifies = ByteUtil.toHexString(sign).equals(ByteUtil.toHexString(mac));
 							if (!verifies) {
 								logger.warning("Incorrect MAC!");
 							}
@@ -342,7 +272,7 @@ public class IPFSIOPlugin extends IOPlugin {
 							
 							if (!got_enc_nonce) {
 								// check it matches...
-								if (SecioHelper.toHexString(plainText).equals(SecioHelper.toHexString(secio.local_propose.getRand().toByteArray()))) {
+								if (ByteUtil.toHexString(plainText).equals(ByteUtil.toHexString(secio.local_propose.getRand().toByteArray()))) {
 									logger.info("The decrypted nonce matches");	
 								}
 
@@ -418,9 +348,9 @@ public class IPFSIOPlugin extends IOPlugin {
 												System.out.println("HEX DATA");
 												showHexData(idd);
 
-												System.out.println("HEX " + SecioHelper.toHexString(idd));
+												System.out.println("HEX " + ByteUtil.toHexString(idd));
 
-												System.out.println("Pub " + SecioHelper.toHexString(secio.remote_propose.getPubkey().toByteArray()));
+												System.out.println("Pub " + ByteUtil.toHexString(secio.remote_propose.getPubkey().toByteArray()));
 																								
 
 												//for(int i=1;i<32;i++) {
