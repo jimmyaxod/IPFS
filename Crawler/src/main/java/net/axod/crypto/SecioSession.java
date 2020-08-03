@@ -1,6 +1,7 @@
 package net.axod.crypto;
 
 import net.axod.*;
+import net.axod.util.*;
 
 import com.google.protobuf.*;
 
@@ -58,6 +59,7 @@ public class SecioSession {
 	 *
 	 */
 	public void decideOrder() {
+		Timing.enter("Secio.decideOrder");
 		try {
 			MessageDigest md = MessageDigest.getInstance("SHA-256");
 			md.update(remote_propose.getPubkey().toByteArray());
@@ -91,16 +93,22 @@ public class SecioSession {
 			System.err.println("java.security.NoSuchAlgorithmException");
 			System.exit(-1);	
 		}
+		Timing.leave("Secio.decideOrder");
 	}
-	
+
+	/**
+	 * Create a local exchange packet to send out.
+	 * To do this, we need to know our PrivateKey so we can sign using it.
+	 */
 	public void createLocalExchange(PrivateKey privk) throws Exception {
+		Timing.enter("Secio.createLocalExchange");
 		// First we need to create EC keypair
 		// Second we need to create a signature
 		KeyPairGenerator keyGen = KeyPairGenerator.getInstance("EC");
         SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
         keyGen.initialize(256, random);
         ec_keys = keyGen.generateKeyPair();
-		
+
 		// Encode the pubkey as required...
         byte[] pubk = ec_keys.getPublic().getEncoded();
 
@@ -125,9 +133,15 @@ public class SecioSession {
 						.setEpubkey(ByteString.copyFrom(ec_pubkey))
 						.setSignature(ByteString.copyFrom(signature))
 						.build();		
+		Timing.leave("Secio.createLocalExchange");
 	}
 	
+	/**
+	 * Create a local Propose packet to send out.
+	 *
+	 */
 	public void createLocalPropose(byte[] publickey, String exchanges, String ciphers, String hashes) {
+		Timing.enter("Secio.createLocalPropose");
 		// Create our own random nonce...
 		byte[] orand = new byte[16];
 		for(int i=0;i<orand.length;i++) {
@@ -149,24 +163,34 @@ public class SecioSession {
 								  .setCiphers(ciphers)
 								  .setHashes(hashes)
 								  .build();
+		Timing.leave("Secio.createLocalPropose");
 	}
 	
+	/**
+	 * Check the signature of a received Exchange packet
+	 *
+	 */
 	public boolean checkSignature() throws Exception {
-		byte[] pubkey = remote_propose.getPubkey().toByteArray();
-		PeerKeyProtos.PublicKey pka = PeerKeyProtos.PublicKey.parseFrom(pubkey);
-		
-		// TODO: Make sure it's an RSA key...
-		
-		byte[] keybytes = pka.getData().toByteArray();		
-		PublicKey pk = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(keybytes));
-
-		// TODO: Do we need to support others?
-		Signature verify = Signature.getInstance("SHA256withRSA");
-		verify.initVerify(pk);
-		verify.update(remote_propose.toByteArray());
-		verify.update(local_propose.toByteArray());
-		verify.update(remote_exchange.getEpubkey().toByteArray());
-		return verify.verify(remote_exchange.getSignature().toByteArray());		
+		Timing.enter("Secio.checkSignature");
+		try {
+			byte[] pubkey = remote_propose.getPubkey().toByteArray();
+			PeerKeyProtos.PublicKey pka = PeerKeyProtos.PublicKey.parseFrom(pubkey);
+			
+			// TODO: Make sure it's an RSA key...
+			
+			byte[] keybytes = pka.getData().toByteArray();		
+			PublicKey pk = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(keybytes));
+	
+			// TODO: Do we need to support others?
+			Signature verify = Signature.getInstance("SHA256withRSA");
+			verify.initVerify(pk);
+			verify.update(remote_propose.toByteArray());
+			verify.update(local_propose.toByteArray());
+			verify.update(remote_exchange.getEpubkey().toByteArray());
+			return verify.verify(remote_exchange.getSignature().toByteArray());		
+		} finally {
+			Timing.leave("Secio.checkSignature");
+		}
 	}
 	
 	/**
@@ -209,6 +233,7 @@ public class SecioSession {
 	 *
 	 */
 	public void initCiphersMacs() throws Exception {
+		Timing.enter("secio.initCiphersMacs");
 		String cipher = "AES-256";
 		String hasher = "SHA256";
 		
@@ -233,8 +258,6 @@ public class SecioSession {
 							
 							// For P-256, the shared secret should be 32 bytes...
 
-		//
-		
 		int iv_size = 16;
 		int key_size = 16;		// AES-128 is 16, AES-256 is 32
 		if (cipher.equals("AES-128")) key_size = 16;
@@ -331,24 +354,141 @@ public class SecioSession {
 		incoming_cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(rkey, "AES"), new IvParameterSpec(riv));
 		outgoing_cipher = Cipher.getInstance("AES/CTR/NoPadding");
 		outgoing_cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(lkey, "AES"), new IvParameterSpec(liv));
-		logger.info("Have initialized HMAC and ciphers");
+		logger.fine("Secio: Have initialized HMAC and ciphers");
+		Timing.leave("secio.initCiphersMacs");
 	}
-	
+
+	/**
+	 * Write some data out using the cipher and mac
+	 *
+	 */
 	public void write(ByteBuffer out, ByteBuffer data) {
 		data.flip();
 		byte[] d = new byte[data.remaining()];
 		data.get(d);
 		write(out, d);
 	}
-	
-	// Write encrypted data...
+
+	/**
+	 * Write some data out using the cipher and mac
+	 *
+	 */
 	public void write(ByteBuffer out, byte[] data) {		
+		Timing.enter("secio.write");
 		byte[] enc_data = outgoing_cipher.update(data);
 		byte[] mac_data = outgoing_HMAC.doFinal(enc_data);
 		
 		out.putInt(enc_data.length + mac_data.length);
 		out.put(enc_data);
 		out.put(mac_data);	
+		Timing.enter("secio.write");
+	}
+
+	/**
+	 * Process some incomming data on this session...
+	 *
+	 * @param	in	Input buffer
+	 * @param	out	Output buffer, for handshaking etc
+	 *
+	 * @returns	LinkedList of incoming packets
+	 */
+	public LinkedList process(ByteBuffer in, ByteBuffer out, KeyPair mykeys) throws SecioException {
+		LinkedList inq = new LinkedList();
+		while(in.position()>0) {
+			in.flip();
+			try {
+				int len = in.getInt();		// Length is 32bit int
+				if (len>8000000) {
+					logger.warning("Got a packet of >8MB?");
+					throw new SecioException("Packet of >8MB");
+				}
+				
+				byte[] data = new byte[len];
+				in.get(data);
+						
+				if (remote_propose == null) {							
+					remote_propose = SecioProtos.Propose.parseFrom(data);
+					logger.fine("Secio remote propose\n" + remote_propose + "\n");
+	
+					//byte[] pubkey = remote_propose.getPubkey().toByteArray();
+					//PeerKeyProtos.PublicKey pk = PeerKeyProtos.PublicKey.parseFrom(pubkey);
+					//logger.info("Secio remote peerID " + getPeerID(pubkey));
+
+					createLocalPropose(mykeys.getPublic().getEncoded(), "P-256", "AES-256", "SHA256");							
+					logger.fine("Secio local propose\n" + local_propose);							
+
+					byte[] odata = local_propose.toByteArray();
+					out.putInt(odata.length);
+					out.put(odata);
+				} else if (remote_exchange == null) {
+							//
+							// Now we have done the Propose, lets decide the order, and then we can decide on exchange, ciphers, hashes etc
+					decideOrder();
+
+							// Now we're expecting an Exchange...
+					remote_exchange = SecioProtos.Exchange.parseFrom(data);
+					logger.fine("Secio remote exchange\n" + remote_exchange + "\n");
+
+					if (!checkSignature()) {
+						logger.warning("Secio signature did not validate!");
+						throw new SecioException("Secio signature did not validate");
+					}
+
+					createLocalExchange(mykeys.getPrivate());							
+					logger.fine("Secio local exchange\n" + local_exchange);
+
+					byte[] odata = local_exchange.toByteArray();
+					out.putInt(odata.length);
+					out.put(odata);
+
+					initCiphersMacs();
+				} else {
+					// General incoming data then...
+					
+					// First split off the mac, verify that's correct
+					int maclen = incoming_HMAC.getMacLength();
+        			byte[] mac = new byte[maclen];
+        			System.arraycopy(data, data.length - mac.length, mac, 0, mac.length);        					
+        			byte[] datanomac = new byte[data.length - mac.length];
+        			System.arraycopy(data, 0, datanomac, 0, datanomac.length);
+					byte[] sign = incoming_HMAC.doFinal(datanomac);
+					boolean verifies = ByteUtil.toHexString(sign).equals(ByteUtil.toHexString(mac));
+					if (!verifies) {
+						logger.warning("Incorrect MAC!");
+						throw new SecioException("Secio incorrect MAC");
+					}							
+        			byte[] plainText = incoming_cipher.update(datanomac);
+
+					if (!got_enc_nonce) {
+						// check it matches...
+						if (!ByteUtil.toHexString(plainText).equals(ByteUtil.toHexString(local_propose.getRand().toByteArray()))) {
+							logger.warning("The decrypted nonce does NOT match");
+							throw new SecioException("Secio nonce does NOT match");
+						}
+
+						// Now we will send our own...
+						write(out, remote_propose.getRand().toByteArray());
+						logger.fine("Sent our encrypted signed nonce");
+								
+						got_enc_nonce = true;
+					} else {
+						// Add the message to our return list...
+						inq.add(plainText);		
+					}
+				}
+			} catch(BufferUnderflowException bue) {
+				// Not enough data...
+				in.rewind();		// Undo this packet read
+				in.compact();
+				break;
+			} catch(SecioException se) {
+				throw(se);
+			} catch(Exception e) {
+				throw(new SecioException(e.toString()));
+			}
+			in.compact();
+		}
+		return inq;
 	}
 
 }

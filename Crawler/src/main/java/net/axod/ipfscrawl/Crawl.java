@@ -53,6 +53,7 @@ public class Crawl {
 				if (System.currentTimeMillis() - lastStatus > PERIOD_STATUS) {
 					logger.info("STATUS " + io);
 					logger.info("STATUS currentConnectedHosts " + currentConnectedHosts.size());
+					Timing.showTimings();
 					lastStatus = System.currentTimeMillis();
 				} else {
 					Thread.currentThread().sleep(1000);	
@@ -74,8 +75,9 @@ public class Crawl {
 	public static void addConnection(MultiAddress ma) {
 		if (!ma.isTCPIP()) return;
 		try {
+
 			String host = ma.getHost();
-			if (host.indexOf(":")!=-1) return;	// Don't care about ipv6 for now
+//			if (host.indexOf(":")!=-1) return;	// Don't care about ipv6 for now
 			int port = ma.getTCPPort();
 			
 			if (currentConnectedHosts.contains(host)) {
