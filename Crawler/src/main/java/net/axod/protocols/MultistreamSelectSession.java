@@ -5,11 +5,18 @@ import java.util.logging.*;
 
 /**
  * This knows about multistream
- * It can read and write
+ * It can read and write messages, and you can use the process to handle a
+ * handshake.
+ *
+ * eg
+ * multi_secio = new Multistream(Multistream.PROTO_SECIO);
+ * ...
+ * if (multi_secio.process(in, out)) {
+ *     //do next thing inside secio
  *
  */
- 
-public class Multistream {
+
+public class MultistreamSelectSession {
     private static Logger logger = Logger.getLogger("net.axod.protocols");
 	public final static String MULTISTREAM = "/multistream/1.0.0\n";
 
@@ -18,18 +25,23 @@ public class Multistream {
 
 	public String proto = null;
 	public boolean handshaked = false;
-	
+
 	/**
 	 * Setup a new multistream
-	 *
+	 * @param	proto	Which protocol do we want. Must include \n
+	 *					You can use any of the PROTO_* defs above.
 	 */
-	public Multistream(String proto) {
+	public MultistreamSelectSession(String proto) {
 		this.proto = proto;
 	}
 	
 	/**
 	 * Process a multistream select
 	 *
+	 * @param	in	Input buffer
+	 * @param	out	An output buffer we can write to
+	 *
+	 * @return	true when multistream handshake has completed
 	 */
 	public boolean process(ByteBuffer in, ByteBuffer out) {
 		if (!handshaked) {
@@ -63,19 +75,37 @@ public class Multistream {
 		return handshaked;		
 	}
 	
+	/**
+	 * Write a multistream message
+	 *
+	 * @param	dest	Destination buffer
+	 * @param	data	Message to write
+	 */
 	public static void writeMultistream(ByteBuffer dest, String data) {
 		byte[] d = data.getBytes();
 		writeVarInt(dest, d.length);
 		dest.put(d);
 	}
 
-	public static String readMultistream(ByteBuffer src) {
+	/**
+	 * Read a multistream message
+	 *
+	 * @param	src		Source buffer
+	 */
+	public static String readMultistream(ByteBuffer src) throws BufferUnderflowException {
 		long len = readVarInt(src);
+		// TODO: Sanity check, and protection here. We need to limit len.
 		byte[] data = new byte[(int)len];
 		src.get(data);
 		return new String(data);
 	}
 
+	/**
+	 * Write a variable length integer to the output buffer
+	 * @param	oo	Output buffer
+	 * @param	v	Value to write
+	 *
+	 */
 	public static void writeVarInt(ByteBuffer oo, long v) {
 		while(true) {
 			byte d = (byte)(v & 0x7f);
@@ -90,6 +120,11 @@ public class Multistream {
 		}
 	}
 
+	/**
+	 * Read a variable length int from the bytebuffer
+	 * @param bb	Source buffer to read from
+	 *
+	 */
 	public static long readVarInt(ByteBuffer bb) throws BufferUnderflowException {
 		long len = 0;
 		int sh = 0;

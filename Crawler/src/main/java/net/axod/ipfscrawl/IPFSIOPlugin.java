@@ -40,13 +40,13 @@ public class IPFSIOPlugin extends IOPlugin {
     String host = null;
 
     // Negotiate multistream secio
-	Multistream multi_secio = new Multistream(Multistream.PROTO_SECIO);
+	MultistreamSelectSession multi_secio = new MultistreamSelectSession(MultistreamSelectSession.PROTO_SECIO);
 	
 	// This handles a SECIO session
 	SecioSession secio = new SecioSession();
 
 	// Negotiate multistream yamux
-	Multistream multi_yamux = new Multistream(Multistream.PROTO_YAMUX);
+	MultistreamSelectSession multi_yamux = new MultistreamSelectSession(MultistreamSelectSession.PROTO_YAMUX);
 	
 	boolean sentInitYamux = false;
 
@@ -56,6 +56,10 @@ public class IPFSIOPlugin extends IOPlugin {
 	// My RSA keys
 	KeyPair mykeys = null;	
 
+	// Some stats...
+	static long total_sent_pings = 0;
+	static long total_sent_find_node = 0;
+	
 	/**
 	 * Given a public key, we can get a Multihash which shows the PeerID in a
 	 * more usable format.
@@ -129,7 +133,7 @@ public class IPFSIOPlugin extends IOPlugin {
 
 	private void writeYamuxMultistreamEnc(String d, int m_stream, short m_flags) {
 		ByteBuffer bbm = ByteBuffer.allocate(8192);
-		Multistream.writeMultistream(bbm, d);		
+		MultistreamSelectSession.writeMultistream(bbm, d);		
 		bbm.flip();
 		byte[] multi_data = new byte[bbm.remaining()];
 		bbm.get(multi_data);
@@ -149,7 +153,6 @@ public class IPFSIOPlugin extends IOPlugin {
 	 */
 	public void work() {
 		if (on_dht && (System.currentTimeMillis() - lastPingTime > PERIOD_PING)) {
-			System.out.println("Sending a PING...");
 			int dht_stream = 7;
 
 			DHTProtos.Message msg = DHTProtos.Message.newBuilder()
@@ -159,7 +162,7 @@ public class IPFSIOPlugin extends IOPlugin {
 			// OK now lets send it...
 			byte[] multi_data = msg.toByteArray();
 			ByteBuffer vo = ByteBuffer.allocate(8192);
-			Multistream.writeVarInt(vo, multi_data.length);
+			MultistreamSelectSession.writeVarInt(vo, multi_data.length);
 			vo.put(multi_data);
 			vo.flip();
 			byte[] multi_data2 = new byte[vo.remaining()];
@@ -167,6 +170,7 @@ public class IPFSIOPlugin extends IOPlugin {
 			ByteBuffer bbo = ByteBuffer.allocate(8192);
 			Yamux.writeYamux(bbo, multi_data2, dht_stream, (short)0);
 			secio.write(out, bbo);		// Write it out...
+			total_sent_pings++;
 			
 			lastPingTime = System.currentTimeMillis();	
 		}
@@ -180,8 +184,6 @@ public class IPFSIOPlugin extends IOPlugin {
 			
 			Multihash h = new Multihash(Multihash.Type.sha2_256, digest);														
 			
-			System.out.println("Sending a query for " + h);
-
 			DHTProtos.Message msg = DHTProtos.Message.newBuilder()
 							.setType(DHTProtos.Message.MessageType.FIND_NODE)
 							.setKey(ByteString.copyFromUtf8(h.toString()))
@@ -190,7 +192,7 @@ public class IPFSIOPlugin extends IOPlugin {
 			// OK now lets send it...
 			byte[] multi_data = msg.toByteArray();
 			ByteBuffer vo = ByteBuffer.allocate(8192);
-			Multistream.writeVarInt(vo, multi_data.length);
+			MultistreamSelectSession.writeVarInt(vo, multi_data.length);
 			vo.put(multi_data);
 			vo.flip();
 			byte[] multi_data2 = new byte[vo.remaining()];
@@ -198,8 +200,7 @@ public class IPFSIOPlugin extends IOPlugin {
 			ByteBuffer bbo = ByteBuffer.allocate(8192);
 			Yamux.writeYamux(bbo, multi_data2, dht_stream, (short)0);
 			secio.write(out, bbo);		// Write it out...
-			System.out.println("Just sent a DHT PING");
-		
+			total_sent_find_node++;
 			
 			lastQueryTime = System.currentTimeMillis();
 		}
@@ -207,8 +208,7 @@ public class IPFSIOPlugin extends IOPlugin {
 		logger.fine("Work " + in);
 		
 		if (in.position()>0) {
-			
-			// ======== Multistream handshake ==================================
+			// ======== multistream select scio ================================
 			if (multi_secio.process(in, out)) {
 				try {
 					LinkedList spackets = secio.process(in, out, mykeys);
@@ -238,8 +238,9 @@ public class IPFSIOPlugin extends IOPlugin {
 		inbuff.compact();
 		
 		ByteBuffer outbuff = ByteBuffer.allocate(8192);		// For now...
+		
+		// multistream select yamux
 		if (multi_yamux.process(inbuff, outbuff)) {
-			System.out.println("Yamux...");
 			if (!sentInitYamux) {
 				writeYamuxMultistreamEnc("/multistream/1.0.0\n", 3, (short)1);
 				writeYamuxMultistreamEnc("/ipfs/id/1.0.0\n", 3, (short)0);											
@@ -251,7 +252,7 @@ public class IPFSIOPlugin extends IOPlugin {
 		// Send any multistream handshake stuff to next layer
 		outbuff.flip();
 		if (outbuff.remaining()>0) {
-			System.out.println("Sending data " + outbuff.remaining());
+			logger.fine("Sending data " + outbuff.remaining());
 			byte[] wdata = new byte[outbuff.remaining()];
 			outbuff.get(wdata);
 			secio.write(out, wdata);
@@ -272,7 +273,7 @@ public class IPFSIOPlugin extends IOPlugin {
 			int m_length = inbuff.getInt();
 			ByteBuffer inbuffp = ByteBuffer.allocate(8192);
 
-			System.out.println("yamux ver=" + m_ver + " type=" + m_type + " flags=" + m_flags + " id=" + m_stream + " len=" + m_length);
+			//System.out.println("yamux ver=" + m_ver + " type=" + m_type + " flags=" + m_flags + " id=" + m_stream + " len=" + m_length);
 			
 			if (m_type==0) {
 				byte[] d = new byte[m_length];
@@ -285,8 +286,8 @@ public class IPFSIOPlugin extends IOPlugin {
 				if (m_stream==3) {
 					if (!setup_stream_6) {
 						while(inbuffp.remaining()>0) {
-							String l = Multistream.readMultistream(inbuffp);											
-							logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
+							String l = MultistreamSelectSession.readMultistream(inbuffp);											
+							logger.fine("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
 							if (l.equals("/ipfs/id/1.0.0\n")) {
 								setup_stream_6 = true;
 								break;
@@ -296,14 +297,14 @@ public class IPFSIOPlugin extends IOPlugin {
 					
 					if(inbuffp.remaining()>0) {
 						// Read a varint
-						int ll = (int)Multistream.readVarInt(inbuffp);
+						int ll = (int)MultistreamSelectSession.readVarInt(inbuffp);
 
 						byte[] idd = new byte[ll];
 						inbuffp.get(idd);
 						
 						IPFSProtos.Identify ident = IPFSProtos.Identify.parseFrom(idd);
 						
-						System.out.println("IDENT " + ident);
+						//System.out.println("IDENT " + ident);
 						
 						// That's their ID
 						String agentVersion = ident.getAgentVersion();
@@ -322,7 +323,7 @@ public class IPFSIOPlugin extends IOPlugin {
 						Crawl.outputs.writeFile("ids", now + "," + host + "," + getPeerID(pubkey) + "," + agentVersion + "," + protocolVersion + "," + protocols + "\n");
 
 						
-						System.out.println("Starting a new stream, kad...");
+						//System.out.println("Starting a new stream, kad...");
 						writeYamuxMultistreamEnc("/multistream/1.0.0\n", 7, (short)1);
 						writeYamuxMultistreamEnc("/ipfs/kad/1.0.0\n", 7, (short)0);											
 					}
@@ -331,8 +332,8 @@ public class IPFSIOPlugin extends IOPlugin {
 					if (!setup_stream_7) {
 
 						while(inbuffp.remaining()>0) {
-							String l = Multistream.readMultistream(inbuffp);											
-							logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
+							String l = MultistreamSelectSession.readMultistream(inbuffp);											
+							//logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
 							if (l.equals("/ipfs/kad/1.0.0\n")) {
 								setup_stream_7 = true;
 								
@@ -346,7 +347,7 @@ public class IPFSIOPlugin extends IOPlugin {
 					if(inbuffp.remaining()>0) {
 
 						// Read a varint
-						int ll = (int)Multistream.readVarInt(inbuffp);
+						int ll = (int)MultistreamSelectSession.readVarInt(inbuffp);
 
 						byte[] idd = new byte[ll];
 						inbuffp.get(idd);
@@ -365,7 +366,7 @@ public class IPFSIOPlugin extends IOPlugin {
 						while(i.hasNext()) {
 							DHTProtos.Message.Peer closer = (DHTProtos.Message.Peer)i.next();
 							Multihash id = new Multihash(closer.getId().toByteArray());
-							System.out.println("PEER " + id);
+							//System.out.println("PEER " + id);
 							
 							// Parse the addrs, and see if we can connect to anything...
 							Iterator j = closer.getAddrsList().iterator();
@@ -373,7 +374,7 @@ public class IPFSIOPlugin extends IOPlugin {
 								byte[] a = ((ByteString)j.next()).toByteArray();
 								try {
 									MultiAddress ma = new MultiAddress(a);
-									System.out.println(" : " + ma);
+								//	System.out.println(" : " + ma);
 									long now = System.currentTimeMillis();
 									Crawl.outputs.writeFile("peers", now + "," + id + "," + ma + "\n");
 									
@@ -391,8 +392,8 @@ public class IPFSIOPlugin extends IOPlugin {
 				} else {
 				
 					while(inbuffp.remaining()>0) {
-						String l = Multistream.readMultistream(inbuffp);											
-						logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
+						String l = MultistreamSelectSession.readMultistream(inbuffp);											
+//						logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
 
 						if (l.equals("/multistream/1.0.0\n")) {
 
@@ -400,7 +401,6 @@ public class IPFSIOPlugin extends IOPlugin {
 							writeYamuxMultistreamEnc("/ipfs/id/1.0.0\n", m_stream, (short)0);
 
 						} else if (l.equals("/ipfs/id/1.0.0\n")) {
-							System.out.println("TODO: Send our ID info...");
 							IPFSProtos.Identify id = IPFSProtos.Identify.newBuilder()
 										 .setProtocolVersion("ipfs/0.1.0")
 										 .setAgentVersion("mindYourOwnBusiness/0.0.1")
@@ -410,11 +410,10 @@ public class IPFSIOPlugin extends IOPlugin {
 										 .addProtocols("/ipfs/id/1.0.0")
 										 .addProtocols("/ipfs/kad/1.0.0")
 										 .build();
-							System.out.println("Our ID " + id);
 
 							byte[] multi_data = id.toByteArray();
 							ByteBuffer vo = ByteBuffer.allocate(8192);
-							Multistream.writeVarInt(vo, multi_data.length);
+							MultistreamSelectSession.writeVarInt(vo, multi_data.length);
 							vo.put(multi_data);
 							vo.flip();
 							byte[] multi_data2 = new byte[vo.remaining()];
