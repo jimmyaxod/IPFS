@@ -48,12 +48,10 @@ public class MultistreamSelectSession {
 			// We haven't performed the multistream handshake yet, so we should do that now.
 			in.flip();
 			
-			System.out.println("in remaining " + in.remaining());
-			
 			// Try to read a complete packet. If we can't we abort so we can try later.
 			try {
 				String l = readMultistream(in);	
-				logger.info("Multistream handshake (" + l.trim() + ")");
+				logger.fine("Multistream handshake (" + l.trim() + ")");
 
 				// For now, we only support multistream/1.0.0
 				if (l.equals(MULTISTREAM)) {
@@ -65,7 +63,7 @@ public class MultistreamSelectSession {
 				} else if (l.equals(proto)) {
 					// OK, need to move on to next stage now...
 					handshaked = true;
-					logger.info("Switching to " + proto);
+					logger.fine("Switching to " + proto);
 				}
 			} catch(BufferUnderflowException bue) {
 				in.rewind();	// Partial packet. We'll try and read again later...

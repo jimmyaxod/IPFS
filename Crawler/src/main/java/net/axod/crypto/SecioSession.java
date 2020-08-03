@@ -402,10 +402,10 @@ public class SecioSession {
 					logger.warning("Got a packet of >8MB?");
 					throw new SecioException("Packet of >8MB");
 				}
-				
+
 				byte[] data = new byte[len];
 				in.get(data);
-						
+
 				if (remote_propose == null) {							
 					remote_propose = SecioProtos.Propose.parseFrom(data);
 					logger.fine("Secio remote propose\n" + remote_propose + "\n");
@@ -473,7 +473,7 @@ public class SecioSession {
 						got_enc_nonce = true;
 					} else {
 						// Add the message to our return list...
-						inq.add(plainText);		
+						inq.add(plainText);
 					}
 				}
 			} catch(BufferUnderflowException bue) {

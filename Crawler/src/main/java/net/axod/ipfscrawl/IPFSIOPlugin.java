@@ -16,6 +16,7 @@ import io.ipfs.multiaddr.*;
 import java.net.*;
 import java.nio.*;
 import java.util.*;
+import java.util.concurrent.atomic.*;
 import java.security.*;
 import java.math.*;
 import java.security.spec.*;
@@ -48,17 +49,57 @@ public class IPFSIOPlugin extends IOPlugin {
 	// Negotiate multistream yamux
 	MultistreamSelectSession multi_yamux = new MultistreamSelectSession(MultistreamSelectSession.PROTO_YAMUX);
 	
+	ByteBuffer yamuxInbuffer = ByteBuffer.allocate(200000);
+
 	boolean sentInitYamux = false;
 
 	boolean setup_stream_6 = false;
 	boolean setup_stream_7 = false;
 		
 	// My RSA keys
-	KeyPair mykeys = null;	
+	static KeyPair mykeys = null;	
 
+	static {
+        // TODO: Allow reusing previous keys. These should be stored and reused.
+        try {
+        	KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+        	SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+
+        	keyGen.initialize(2048, random);
+
+        	mykeys = keyGen.generateKeyPair();
+
+        } catch(Exception e) {
+        	logger.warning("Can't generate keys!");	
+        }		
+	}
+	
 	// Some stats...
 	static long total_sent_pings = 0;
 	static long total_sent_find_node = 0;
+
+	static HashMap total_recv_types = new HashMap();
+	
+	private static void incRecvType(String type) {
+		AtomicLong al = (AtomicLong)total_recv_types.get(type);
+		if (al==null) {
+			al = new AtomicLong(0);
+			total_recv_types.put(type, al);
+		}
+		al.incrementAndGet();
+	}
+	
+	public static void showStatus() {
+		System.out.println("IPFSIOPlugin sent_pings=" + total_sent_pings
+			                         + " sent_find_node=" + total_sent_find_node);
+
+		Iterator i = total_recv_types.keySet().iterator();
+		while(i.hasNext()) {
+			String type = (String)i.next();
+			AtomicLong al = (AtomicLong)total_recv_types.get(type);
+			System.out.println("IPFSIOPlugin recv " + type + " " + al.longValue());
+		}
+	}
 	
 	/**
 	 * Given a public key, we can get a Multihash which shows the PeerID in a
@@ -96,23 +137,12 @@ public class IPFSIOPlugin extends IOPlugin {
         out.order(ByteOrder.BIG_ENDIAN);        
         
         host = (String)n.properties.get("host");
-        Crawl.registerConnection(host);
-        
-        
-        // TODO: Allow reusing previous keys. These should be stored and reused.
-        try {
-        	KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-        	SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
-
-        	keyGen.initialize(2048, random);
-
-        	mykeys = keyGen.generateKeyPair();
-
-        } catch(Exception e) {
-        	logger.warning("Can't generate keys!");	
-        }
+        Crawl.registerConnection(host);        
 	}
 
+	private long ctime = System.currentTimeMillis();
+	private long MAX_TIME = 60*1000;
+	
 	private long lastPingTime = 0;
 	private long PERIOD_PING = 10*1000;
 
@@ -125,9 +155,12 @@ public class IPFSIOPlugin extends IOPlugin {
 	 * Does the plugin need to send anything
 	 */
 	public boolean wantsToWork() {
-		if (on_dht && (System.currentTimeMillis() - lastPingTime > PERIOD_PING)) return true;
+		long now = System.currentTimeMillis();
+		if (on_dht && (now - lastPingTime > PERIOD_PING)) return true;
 
-		if (on_dht && (System.currentTimeMillis() - lastQueryTime > PERIOD_QUERY)) return true;
+		if (on_dht && (now - lastQueryTime > PERIOD_QUERY)) return true;
+		
+		if (now - ctime > MAX_TIME) return true;
 		return false;	
 	}
 
@@ -152,7 +185,13 @@ public class IPFSIOPlugin extends IOPlugin {
 	 *
 	 */
 	public void work() {
-		if (on_dht && (System.currentTimeMillis() - lastPingTime > PERIOD_PING)) {
+		long now = System.currentTimeMillis();
+		if (now - ctime > MAX_TIME) {
+			close();
+			return;
+		}
+
+		if (on_dht && (now - lastPingTime > PERIOD_PING)) {
 			int dht_stream = 7;
 
 			DHTProtos.Message msg = DHTProtos.Message.newBuilder()
@@ -172,10 +211,10 @@ public class IPFSIOPlugin extends IOPlugin {
 			secio.write(out, bbo);		// Write it out...
 			total_sent_pings++;
 			
-			lastPingTime = System.currentTimeMillis();	
+			lastPingTime = now;	
 		}
 
-		if (on_dht && (System.currentTimeMillis() - lastQueryTime > PERIOD_QUERY)) {
+		if (on_dht && (now - lastQueryTime > PERIOD_QUERY)) {
 			int dht_stream = 7;
 			byte[] digest = new byte[32];
 			for(int i=0;i<digest.length;i++) {
@@ -202,11 +241,11 @@ public class IPFSIOPlugin extends IOPlugin {
 			secio.write(out, bbo);		// Write it out...
 			total_sent_find_node++;
 			
-			lastQueryTime = System.currentTimeMillis();
+			lastQueryTime = now;
 		}
 		
 		logger.fine("Work " + in);
-		
+
 		if (in.position()>0) {
 			// ======== multistream select scio ================================
 			if (multi_secio.process(in, out)) {
@@ -220,8 +259,12 @@ public class IPFSIOPlugin extends IOPlugin {
 					logger.info("Exception within secio " + se);
 					close();
 					return;
+				} catch(BufferUnderflowException bue) {
+					logger.info("Exception processing packet underflow " + bue);
+					bue.printStackTrace();					
 				} catch(Exception e) {
 					logger.info("Exception processing packet " + e);
+					e.printStackTrace();
 					close();
 					return;					
 				}
@@ -234,19 +277,18 @@ public class IPFSIOPlugin extends IOPlugin {
 	 *
 	 */
 	public void processSecioPacket(byte[] plainText) throws Exception {
-		ByteBuffer inbuff = ByteBuffer.wrap(plainText);
-		inbuff.compact();
+		yamuxInbuffer.put(plainText);	// Add it on...
 		
 		ByteBuffer outbuff = ByteBuffer.allocate(8192);		// For now...
 		
 		// multistream select yamux
-		if (multi_yamux.process(inbuff, outbuff)) {
+		if (multi_yamux.process(yamuxInbuffer, outbuff)) {
 			if (!sentInitYamux) {
 				writeYamuxMultistreamEnc("/multistream/1.0.0\n", 3, (short)1);
 				writeYamuxMultistreamEnc("/ipfs/id/1.0.0\n", 3, (short)0);											
 				sentInitYamux = true;
 			}
-			processYamuxPackets(inbuff);
+			processYamuxPackets(yamuxInbuffer);
 		}
 		
 		// Send any multistream handshake stuff to next layer
@@ -266,184 +308,199 @@ public class IPFSIOPlugin extends IOPlugin {
 	public void processYamuxPackets(ByteBuffer inbuff) throws Exception {	
 		inbuff.flip();
 		while(inbuff.remaining()>0) {
-			byte m_ver = inbuff.get();
-			byte m_type = inbuff.get();
-			short m_flags = inbuff.getShort();
-			int m_stream = inbuff.getInt();
-			int m_length = inbuff.getInt();
-			ByteBuffer inbuffp = ByteBuffer.allocate(8192);
-
-			//System.out.println("yamux ver=" + m_ver + " type=" + m_type + " flags=" + m_flags + " id=" + m_stream + " len=" + m_length);
-			
-			if (m_type==0) {
-				byte[] d = new byte[m_length];
-				inbuff.get(d);
-				inbuffp.put(d);
-				inbuffp.flip();
-			}
-
-			if (m_type==0) { // DATA
-				if (m_stream==3) {
-					if (!setup_stream_6) {
-						while(inbuffp.remaining()>0) {
-							String l = MultistreamSelectSession.readMultistream(inbuffp);											
-							logger.fine("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
-							if (l.equals("/ipfs/id/1.0.0\n")) {
-								setup_stream_6 = true;
-								break;
-							}
-						}
-					}
+			try {
+				byte m_ver = inbuff.get();
+				byte m_type = inbuff.get();
+				short m_flags = inbuff.getShort();
+				int m_stream = inbuff.getInt();
+				int m_length = inbuff.getInt();
+				ByteBuffer inbuffp = ByteBuffer.allocate(200000);
+	
+	//			System.out.println("yamux ver=" + m_ver + " type=" + m_type + " flags=" + m_flags + " id=" + m_stream + " len=" + m_length + " inbuff.remaining()=" + inbuff.remaining());
+				
+				if (m_type==0) {
+					byte[] d = new byte[m_length];
+					inbuff.get(d);
 					
-					if(inbuffp.remaining()>0) {
-						// Read a varint
-						int ll = (int)MultistreamSelectSession.readVarInt(inbuffp);
-
-						byte[] idd = new byte[ll];
-						inbuffp.get(idd);
-						
-						IPFSProtos.Identify ident = IPFSProtos.Identify.parseFrom(idd);
-						
-						//System.out.println("IDENT " + ident);
-						
-						// That's their ID
-						String agentVersion = ident.getAgentVersion();
-						String protocolVersion = ident.getProtocolVersion();
-						String protocols = "";
-						Iterator i = ident.getProtocolsList().iterator();
-						while(i.hasNext()) {
-							String pro = (String)i.next();
-							if (protocols.length()>0) protocols+=" ";
-							protocols+=pro;
-						}
-						
-						byte[] pubkey = secio.remote_propose.getPubkey().toByteArray();
-						
-						long now = System.currentTimeMillis();
-						Crawl.outputs.writeFile("ids", now + "," + host + "," + getPeerID(pubkey) + "," + agentVersion + "," + protocolVersion + "," + protocols + "\n");
-
-						
-						//System.out.println("Starting a new stream, kad...");
-						writeYamuxMultistreamEnc("/multistream/1.0.0\n", 7, (short)1);
-						writeYamuxMultistreamEnc("/ipfs/kad/1.0.0\n", 7, (short)0);											
-					}
+					inbuffp.put(d);
+					inbuffp.flip();
 				}
-				if (m_stream==7) {
-					if (!setup_stream_7) {
-
-						while(inbuffp.remaining()>0) {
-							String l = MultistreamSelectSession.readMultistream(inbuffp);											
-							//logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
-							if (l.equals("/ipfs/kad/1.0.0\n")) {
-								setup_stream_7 = true;
-								
-								on_dht = true;
-								
-								break;
-							}
-						}
-					}
-					
-					if(inbuffp.remaining()>0) {
-
-						// Read a varint
-						int ll = (int)MultistreamSelectSession.readVarInt(inbuffp);
-
-						byte[] idd = new byte[ll];
-						inbuffp.get(idd);
-
-						DHTProtos.Message msg = DHTProtos.Message.parseFrom(idd);
-
-						String msg_json = JsonFormat.printer().print(msg);
-						long now2 = System.currentTimeMillis();
-						Crawl.outputs.writeFile("packets", now2 + "," + msg_json + "\n");
-						
-//												System.out.println("-> KAD PACKET " + msg);
-						
-						// Now we need to parse out closerPeers
-						
-						Iterator i = msg.getCloserPeersList().iterator();
-						while(i.hasNext()) {
-							DHTProtos.Message.Peer closer = (DHTProtos.Message.Peer)i.next();
-							Multihash id = new Multihash(closer.getId().toByteArray());
-							//System.out.println("PEER " + id);
-							
-							// Parse the addrs, and see if we can connect to anything...
-							Iterator j = closer.getAddrsList().iterator();
-							while(j.hasNext()) {
-								byte[] a = ((ByteString)j.next()).toByteArray();
-								try {
-									MultiAddress ma = new MultiAddress(a);
-								//	System.out.println(" : " + ma);
-									long now = System.currentTimeMillis();
-									Crawl.outputs.writeFile("peers", now + "," + id + "," + ma + "\n");
-									
-									// For now...
-									Crawl.addConnection(ma);
-									
-									
-								} catch(Exception e) {
-									// Don't care!	
+	
+				if (m_type==0) { // DATA
+					if (m_stream==3) {
+						if (!setup_stream_6) {
+							while(inbuffp.remaining()>0) {
+								String l = MultistreamSelectSession.readMultistream(inbuffp);											
+								logger.fine("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
+								if (l.equals("/ipfs/id/1.0.0\n")) {
+									setup_stream_6 = true;
+									break;
 								}
-								// TODO: Now connect to those ones etc etc
+							}
+						}
+						
+						if(inbuffp.remaining()>0) {
+							// Read a varint
+							int ll = (int)MultistreamSelectSession.readVarInt(inbuffp);
+	
+							byte[] idd = new byte[ll];
+							inbuffp.get(idd);
+							
+							IPFSProtos.Identify ident = IPFSProtos.Identify.parseFrom(idd);
+							
+							//System.out.println("IDENT " + ident);
+							
+							// That's their ID
+							String agentVersion = ident.getAgentVersion();
+							String protocolVersion = ident.getProtocolVersion();
+							String protocols = "";
+							Iterator i = ident.getProtocolsList().iterator();
+							while(i.hasNext()) {
+								String pro = (String)i.next();
+								if (protocols.length()>0) protocols+=" ";
+								protocols+=pro;
+							}
+							
+							byte[] pubkey = secio.remote_propose.getPubkey().toByteArray();
+							
+							long now = System.currentTimeMillis();
+							Crawl.outputs.writeFile("ids", now + "," + host + "," + getPeerID(pubkey) + "," + agentVersion + "," + protocolVersion + "," + protocols + "\n");
+	
+							
+							//System.out.println("Starting a new stream, kad...");
+							writeYamuxMultistreamEnc("/multistream/1.0.0\n", 7, (short)1);
+							writeYamuxMultistreamEnc("/ipfs/kad/1.0.0\n", 7, (short)0);											
+						}
+					}
+					if (m_stream==7) {
+						if (!setup_stream_7) {
+	
+							while(inbuffp.remaining()>0) {
+								String l = MultistreamSelectSession.readMultistream(inbuffp);											
+								//logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
+								if (l.equals("/ipfs/kad/1.0.0\n")) {
+									setup_stream_7 = true;
+									
+									on_dht = true;
+									
+									break;
+								}
+							}
+						}
+						
+						if(inbuffp.remaining()>0) {
+	
+							// Read a varint
+							int ll = (int)MultistreamSelectSession.readVarInt(inbuffp);
+	
+							byte[] idd = new byte[ll];
+							inbuffp.get(idd);
+	
+							DHTProtos.Message msg = DHTProtos.Message.parseFrom(idd);
+	
+							incRecvType(msg.getType().toString());
+							
+							String msg_json = JsonFormat.printer().print(msg);
+							long now2 = System.currentTimeMillis();
+							Crawl.outputs.writeFile("packets", now2 + "," + msg_json + "\n");
+							
+	//												System.out.println("-> KAD PACKET " + msg);
+							
+							// Now we need to parse out closerPeers
+							
+							Iterator i = msg.getCloserPeersList().iterator();
+							while(i.hasNext()) {
+								DHTProtos.Message.Peer closer = (DHTProtos.Message.Peer)i.next();
+								Multihash id = new Multihash(closer.getId().toByteArray());
+								//System.out.println("PEER " + id);
+								
+								// Parse the addrs, and see if we can connect to anything...
+								Iterator j = closer.getAddrsList().iterator();
+								while(j.hasNext()) {
+									byte[] a = ((ByteString)j.next()).toByteArray();
+									try {
+										MultiAddress ma = new MultiAddress(a);
+									//	System.out.println(" : " + ma);
+										long now = System.currentTimeMillis();
+										Crawl.outputs.writeFile("peers", now + "," + id + "," + ma + "\n");
+										
+										// For now...
+										Crawl.addConnection(ma);
+										
+										
+									} catch(Exception e) {
+										// Don't care!	
+									}
+									// TODO: Now connect to those ones etc etc
+								}
+							}
+						}
+					} else {
+					
+						while(inbuffp.remaining()>0) {
+							String l = MultistreamSelectSession.readMultistream(inbuffp);											
+	//						logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
+	
+							if (l.equals("/multistream/1.0.0\n")) {
+	
+								writeYamuxMultistreamEnc("/multistream/1.0.0\n", m_stream, (short)2);
+								writeYamuxMultistreamEnc("/ipfs/id/1.0.0\n", m_stream, (short)0);
+	
+							} else if (l.equals("/ipfs/id/1.0.0\n")) {
+								String local_peerID = getPeerID(secio.local_propose.getPubkey().toByteArray());
+								String remote_peerID = getPeerID(secio.remote_propose.getPubkey().toByteArray());
+								
+								IPFSProtos.Identify id = IPFSProtos.Identify.newBuilder()
+											 .setProtocolVersion("ipfs/0.1.0")
+											 .setAgentVersion("mindYourOwnBusiness/0.0.1")
+											 .setPublicKey(ByteString.copyFrom(secio.local_propose.getPubkey().toByteArray()))
+											 .addListenAddrs(ByteString.copyFromUtf8("/ip4/86.171.62.88/tcp/4001/p2p/" + local_peerID))
+											 .setObservedAddr(ByteString.copyFromUtf8("/ip4/86.171.62.88/tcp/4001/p2p/" + remote_peerID))
+											 .addProtocols("/ipfs/id/1.0.0")
+											 .addProtocols("/ipfs/kad/1.0.0")
+											 .build();
+	
+								byte[] multi_data = id.toByteArray();
+								ByteBuffer vo = ByteBuffer.allocate(8192);
+								MultistreamSelectSession.writeVarInt(vo, multi_data.length);
+								vo.put(multi_data);
+								vo.flip();
+								byte[] multi_data2 = new byte[vo.remaining()];
+								vo.get(multi_data2);
+								
+								ByteBuffer bbo = ByteBuffer.allocate(8192);
+								
+								Yamux.writeYamux(bbo, multi_data2, m_stream, (short)0);
+								secio.write(out, bbo);		// Write it out...
 							}
 						}
 					}
-				} else {
-				
-					while(inbuffp.remaining()>0) {
-						String l = MultistreamSelectSession.readMultistream(inbuffp);											
-//						logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
-
-						if (l.equals("/multistream/1.0.0\n")) {
-
-							writeYamuxMultistreamEnc("/multistream/1.0.0\n", m_stream, (short)2);
-							writeYamuxMultistreamEnc("/ipfs/id/1.0.0\n", m_stream, (short)0);
-
-						} else if (l.equals("/ipfs/id/1.0.0\n")) {
-							IPFSProtos.Identify id = IPFSProtos.Identify.newBuilder()
-										 .setProtocolVersion("ipfs/0.1.0")
-										 .setAgentVersion("mindYourOwnBusiness/0.0.1")
-										 .setPublicKey(ByteString.copyFrom(secio.local_propose.getPubkey().toByteArray()))
-										 .addListenAddrs(ByteString.copyFromUtf8("/ip4/86.171.62.88/tcp/4001/p2p/QmUXRZsrivZbvUcVPG1HPay5rnwhwoFAPpi1baLr11v4nf"))
-										 .setObservedAddr(ByteString.copyFromUtf8("/ip4/86.171.62.88/tcp/4001/p2p/QmUXRZsrivZbvUcVPG1HPay5rnwhwoFAPpi1baLr11v4nf"))
-										 .addProtocols("/ipfs/id/1.0.0")
-										 .addProtocols("/ipfs/kad/1.0.0")
-										 .build();
-
-							byte[] multi_data = id.toByteArray();
-							ByteBuffer vo = ByteBuffer.allocate(8192);
-							MultistreamSelectSession.writeVarInt(vo, multi_data.length);
-							vo.put(multi_data);
-							vo.flip();
-							byte[] multi_data2 = new byte[vo.remaining()];
-							vo.get(multi_data2);
-							
-							ByteBuffer bbo = ByteBuffer.allocate(8192);
-							
-							Yamux.writeYamux(bbo, multi_data2, m_stream, (short)0);
-							secio.write(out, bbo);		// Write it out...
-						}
-					}
+				} else if (m_type==1) {	// Window update
+					
+				} else if (m_type==2) { // ping
+					// Send a ping back...
+					ByteBuffer bbo = ByteBuffer.allocate(8192);
+					byte[] dummy = new byte[0];
+					Yamux.writeYamux(bbo, dummy, 2, m_stream, (short)2);
+					secio.write(out, bbo);		// Write it out...
+					logger.fine("Replied with ping");
+					
+				} else if (m_type==3) { // go away
+					
 				}
-			} else if (m_type==1) {	// Window update
-				
-			} else if (m_type==2) { // ping
-				// Send a ping back...
-				ByteBuffer bbo = ByteBuffer.allocate(8192);
-				byte[] dummy = new byte[0];
-				Yamux.writeYamux(bbo, dummy, 2, m_stream, (short)2);
-				secio.write(out, bbo);		// Write it out...
-				logger.fine("Replied with ping");
-				
-			} else if (m_type==3) { // go away
-				
+			} catch(BufferUnderflowException bue) {
+				inbuff.rewind();
+				break;
 			}
+			// Progress to the next packet...
+			inbuff.compact();
+			inbuff.flip();
 		}
+		inbuff.compact();
 	}
 	
 	public void closing() {
-		logger.info("Connection closing...");
+		logger.fine("Connection closing...");
         Crawl.unregisterConnection(host);
 	}
 

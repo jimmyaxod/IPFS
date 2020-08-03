@@ -10,8 +10,8 @@ import java.net.*;
  */
 
 public abstract class IOPlugin {
-    private static int DEFAULT_IN_SIZE = 130*1024;
-    private static int DEFAULT_OUT_SIZE = 8*1024;
+    private static int DEFAULT_IN_SIZE = 256*1024;
+    private static int DEFAULT_OUT_SIZE = 128*1024;
     protected IOCore ioCore = null;
     public ByteBuffer in = null;
     public ByteBuffer out = null;

@@ -85,6 +85,11 @@ public class IOCore extends Thread {
         }
     }
     
+    public long msSinceSelect() {
+    	long dt = (System.currentTimeMillis() - lastSelectTime) / 1000;
+    	return dt;
+    }
+    
     /**
      * Show as a string
      *

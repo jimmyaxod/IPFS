@@ -1,1 +1,1 @@
-java -cp target/ipfscrawl-1.0-SNAPSHOT-jar-with-dependencies.jar net.axod.ipfscrawl.Crawl
+java -Xmx4G -Xms4G -cp target/ipfscrawl-1.0-SNAPSHOT-jar-with-dependencies.jar net.axod.ipfscrawl.Crawl

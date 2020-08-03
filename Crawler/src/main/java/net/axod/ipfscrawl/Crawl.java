@@ -15,7 +15,7 @@ import io.ipfs.multiaddr.*;
  *
  */
 
-public class Crawl {
+public class Crawl implements IOCoreListener {
     private static Logger logger = Logger.getLogger("net.axod.ipfscrawl");
 	private static IOCore io;
 	private static long lastStatus = System.currentTimeMillis();
@@ -37,14 +37,15 @@ public class Crawl {
 
 			logger.info("Setting up an IOCore");
 
-			io = new IOCore();
+			io = new IOCore(new Crawl());		// IOCoreListener
 
 			// Try an outgoing connection...
 	
 			Node dest = new Node(new InetSocketAddress("127.0.0.1", 4001));
+			dest.properties.put("host", "127.0.0.1");
 			logger.info("Attempting connection to " + dest + "...");
 
-			IOPluginFactory iof = new IPFSIOPluginFactory("127.0.0.1");
+			IOPluginFactory iof = new IPFSIOPluginFactory();
 			boolean suc = io.addConnection(dest, iof, null);
 			System.out.println("connection ok? " + suc);
 
@@ -52,8 +53,25 @@ public class Crawl {
 			while(true) {
 				if (System.currentTimeMillis() - lastStatus > PERIOD_STATUS) {
 					logger.info("STATUS " + io);
-					logger.info("STATUS currentConnectedHosts " + currentConnectedHosts.size());
+					logger.info("STATUS currentConnectedHosts " + currentConnectedHosts.size() + " recentConnectedHosts " + recentConnectedHosts.size());
+					IPFSIOPlugin.showStatus();
 					Timing.showTimings();
+					
+					// Check for issues watchdog
+					if (io.msSinceSelect() > 10) {
+						// Get a stack trace...
+						logger.warning("### IO ### Thread ### issue ###");
+						
+						StackTraceElement[] stackTrace = io.getStackTrace();
+					   
+						//Once you get StackTraceElement you can also print it to console
+						System.err.println("displaying Stack trace from StackTraceElement in Java");
+						for(StackTraceElement st : stackTrace){
+						    System.err.println(st);
+						}
+//						io.dumpStack();
+					}
+					
 					lastStatus = System.currentTimeMillis();
 				} else {
 					Thread.currentThread().sleep(1000);	
@@ -65,35 +83,76 @@ public class Crawl {
 		}
 	}
 
+	public static long lastExpireTime = 0;
+	public static HashMap recentConnectedHosts = new HashMap();
+	// host -> time
+
 	public static void registerConnection(String host) {
 		currentConnectedHosts.add(host);
 	}
+	
 	public static void unregisterConnection(String host) {
 		currentConnectedHosts.remove(host);	
+		// Put it in recent for a while...
+		recentConnectedHosts.put(host, new Long(System.currentTimeMillis()));
+		
+		long now = System.currentTimeMillis();
+		if (now - lastExpireTime > 5000) {
+			lastExpireTime = now;
+			Iterator i = recentConnectedHosts.keySet().iterator();
+			while(i.hasNext()) {
+				String h = (String)i.next();
+				long t = ((Long)recentConnectedHosts.get(h)).longValue();
+				if (now - t > 30000) {
+					i.remove();				// Expire it	
+				}
+			}
+		}
 	}
-	
-	public static void addConnection(MultiAddress ma) {
-		if (!ma.isTCPIP()) return;
-		try {
 
-			String host = ma.getHost();
+	public static void addConnection(MultiAddress ma) {
+		if (currentConnectedHosts.size()>500) return;		// 500 max for now
+
+		if (!ma.isTCPIP()) return;
+		String host = ma.getHost();
+
 //			if (host.indexOf(":")!=-1) return;	// Don't care about ipv6 for now
-			int port = ma.getTCPPort();
+		int port = ma.getTCPPort();
+
+		try {
 			
 			if (currentConnectedHosts.contains(host)) {
+				return;
+			}
+			
+			if (recentConnectedHosts.containsKey(host)) {
 				// Don't bother
 				return;
 			}
+			currentConnectedHosts.add(host);				// Put it in here...
 	
 			Node dest = new Node(new InetSocketAddress(host, port));
-			logger.info("Attempting connection to " + dest + "...");
+			dest.properties.put("host", host);
+			logger.fine("Attempting connection to " + dest + "...");
 	
-			IOPluginFactory iof = new IPFSIOPluginFactory(host);
+			IOPluginFactory iof = new IPFSIOPluginFactory();
 			boolean suc = io.addConnection(dest, iof, null);
-			System.out.println("connection ok? " + suc);
+			if (!suc) {
+				unregisterConnection(host);	
+			}
+			//System.out.println("connection ok? " + suc);
 		} catch(Exception e) {
 			System.err.println("Connect failed");	
+			unregisterConnection(host);	
 		}
 	}
+
+    public void connectionCallback(Node n, boolean success) {
+    	String host = (String)n.properties.get("host");
+//    	System.out.println("connectionCallback " + n + " host " + host + " " + success);
+    	if (!success) {
+    		unregisterConnection(host);
+    	}
+    }
 	
 }
