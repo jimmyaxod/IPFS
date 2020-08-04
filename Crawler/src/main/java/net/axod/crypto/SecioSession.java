@@ -58,7 +58,7 @@ public class SecioSession {
 	 * This decides who is in charge.
 	 *
 	 */
-	public void decideOrder() {
+	private void decideOrder() {
 		Timing.enter("Secio.decideOrder");
 		try {
 			MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -100,7 +100,7 @@ public class SecioSession {
 	 * Create a local exchange packet to send out.
 	 * To do this, we need to know our PrivateKey so we can sign using it.
 	 */
-	public void createLocalExchange(PrivateKey privk) throws Exception {
+	private void createLocalExchange(PrivateKey privk) throws Exception {
 		Timing.enter("Secio.createLocalExchange");
 		// First we need to create EC keypair
 		// Second we need to create a signature
@@ -140,7 +140,7 @@ public class SecioSession {
 	 * Create a local Propose packet to send out.
 	 *
 	 */
-	public void createLocalPropose(byte[] publickey, String exchanges, String ciphers, String hashes) {
+	private void createLocalPropose(byte[] publickey, String exchanges, String ciphers, String hashes) {
 		Timing.enter("Secio.createLocalPropose");
 		// Create our own random nonce...
 		byte[] orand = new byte[16];
@@ -170,17 +170,24 @@ public class SecioSession {
 	 * Check the signature of a received Exchange packet
 	 *
 	 */
-	public boolean checkSignature() throws Exception {
+	private boolean checkSignature() throws Exception {
 		Timing.enter("Secio.checkSignature");
 		try {
 			byte[] pubkey = remote_propose.getPubkey().toByteArray();
 			PeerKeyProtos.PublicKey pka = PeerKeyProtos.PublicKey.parseFrom(pubkey);
 			
 			// TODO: Make sure it's an RSA key...
+			PeerKeyProtos.KeyType keytype = pka.getType();
+			//System.out.println("keytype " + keytype);
 			
+			if (keytype!=PeerKeyProtos.KeyType.RSA) {
+				System.out.println("Can't support at this time");
+				throw (new SecioException("Unsupported key " + keytype));
+			}
+
 			byte[] keybytes = pka.getData().toByteArray();		
 			PublicKey pk = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(keybytes));
-	
+
 			// TODO: Do we need to support others?
 			Signature verify = Signature.getInstance("SHA256withRSA");
 			verify.initVerify(pk);
@@ -198,7 +205,7 @@ public class SecioSession {
 	 * @param w a 64 byte uncompressed EC point starting with <code>04</code>
 	 * @return an <code>ECPublicKey</code> that the point represents 
 	 */
-	public static ECPublicKey generateP256PublicKeyFromUncompressedW(byte[] w) throws InvalidKeySpecException {
+	private static ECPublicKey generateP256PublicKeyFromUncompressedW(byte[] w) throws InvalidKeySpecException {
 		if (w[0] != 0x04) {
 			throw new InvalidKeySpecException("w is not an uncompressed key");
 		}
@@ -214,7 +221,7 @@ public class SecioSession {
 	 * @param w a 64 byte uncompressed EC point consisting of just a 256-bit X and Y
 	 * @return an <code>ECPublicKey</code> that the point represents 
 	 */
-	public static ECPublicKey generateP256PublicKeyFromFlatW(byte[] w) throws InvalidKeySpecException {
+	private static ECPublicKey generateP256PublicKeyFromFlatW(byte[] w) throws InvalidKeySpecException {
 		byte[] encodedKey = new byte[P256_HEAD.length + w.length];
 		System.arraycopy(P256_HEAD, 0, encodedKey, 0, P256_HEAD.length);
 		System.arraycopy(w, 0, encodedKey, P256_HEAD.length, w.length);
@@ -232,8 +239,9 @@ public class SecioSession {
 	 * Initialize ciphers and macs
 	 *
 	 */
-	public void initCiphersMacs() throws Exception {
+	private void initCiphersMacs() throws Exception {
 		Timing.enter("secio.initCiphersMacs");
+
 		String cipher = "AES-256";
 		String hasher = "SHA256";
 		
@@ -250,14 +258,18 @@ public class SecioSession {
 		org.bouncycastle.math.ec.ECPoint q = p.multiply(ec_priv);
 		byte[] ass = q.getEncoded(false);
 
-		byte[] ss = new byte[32];
-		System.arraycopy(ass, 1, ss, 0, 32);		// Try the first 32 bytes for now...
+		int secret_size = 32;
 							// For key256, it's 32 bytes
 							// For key384, it's 48 bytes
 							// For key521, it's 66 bytes
 							
 							// For P-256, the shared secret should be 32 bytes...
-
+		
+		byte[] ss = new byte[secret_size];
+		System.arraycopy(ass, 1, ss, 0, secret_size);		// Try the first 32 bytes for now...
+															// NB ignore the first byte which is
+															// just 04 signifying uncompressed key
+															
 		int iv_size = 16;
 		int key_size = 16;		// AES-128 is 16, AES-256 is 32
 		if (cipher.equals("AES-128")) key_size = 16;
@@ -373,7 +385,8 @@ public class SecioSession {
 	 * Write some data out using the cipher and mac
 	 *
 	 */
-	public void write(ByteBuffer out, byte[] data) {		
+	public void write(ByteBuffer out, byte[] data) {
+		if (data.length==0) return;
 		Timing.enter("secio.write");
 		byte[] enc_data = outgoing_cipher.update(data);
 		byte[] mac_data = outgoing_HMAC.doFinal(enc_data);
