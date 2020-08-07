@@ -1,10 +1,9 @@
 package net.axod.ipfscrawl;
 
-import net.axod.*;
+import net.axod.pb.*;
 import net.axod.io.*;
 import net.axod.protocols.*;
 import net.axod.crypto.secio.*;
-
 import net.axod.util.*;
 
 import com.google.protobuf.*;

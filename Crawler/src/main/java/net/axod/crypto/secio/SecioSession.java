@@ -1,6 +1,6 @@
 package net.axod.crypto.secio;
 
-import net.axod.*;
+import net.axod.pb.*;
 import net.axod.util.*;
 
 import com.google.protobuf.*;
