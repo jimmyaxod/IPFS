@@ -3,6 +3,7 @@ package net.axod.ipfscrawl;
 import net.axod.pb.*;
 import net.axod.io.*;
 import net.axod.protocols.*;
+import net.axod.protocols.multistream.*;
 import net.axod.crypto.secio.*;
 import net.axod.util.*;
 

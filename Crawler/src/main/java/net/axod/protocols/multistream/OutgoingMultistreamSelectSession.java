@@ -1,4 +1,4 @@
-package net.axod.protocols;
+package net.axod.protocols.multistream;
 
 import java.nio.*;
 import java.util.logging.*;
