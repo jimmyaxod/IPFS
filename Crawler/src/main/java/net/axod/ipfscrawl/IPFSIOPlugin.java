@@ -5,6 +5,7 @@ import net.axod.io.*;
 import net.axod.protocols.*;
 import net.axod.protocols.multistream.*;
 import net.axod.crypto.secio.*;
+import net.axod.crypto.keys.*;
 import net.axod.util.*;
 
 import com.google.protobuf.*;
@@ -57,23 +58,12 @@ public class IPFSIOPlugin extends IOPlugin {
 
 	boolean setup_stream_6 = false;
 	boolean setup_stream_7 = false;
-		
+
 	// My RSA keys
 	static KeyPair mykeys = null;	
 
 	static {
-        // TODO: Allow reusing previous keys. These should be stored and reused.
-        try {
-        	KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-        	SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
-
-        	keyGen.initialize(2048, random);
-
-        	mykeys = keyGen.generateKeyPair();
-
-        } catch(Exception e) {
-        	logger.warning("Can't generate keys!");	
-        }		
+		mykeys = KeyManager.getKeys();
 	}
 	
 	// Some stats...
