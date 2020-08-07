@@ -9,6 +9,12 @@ For now, this will be limited to TCP transport. I'm going to be looking at the D
 * Crawling the DHT by random walk (DONE)
 * Listening for requests by operating in 'server' mode on the DHT (TODO)
 
+Aims
+ * Insight into who is using IPFS, geography, orgs, etc
+ * Network performance. Monitor latency, connectivity, uptime, average query time, etc
+ * Insight into what content is being shared, individual volumes by hash.
+ * Monitor nefarious use of the network - bot control channel eg 'Storm'
+
 Top versions from a crawl
 
 | Count | Version ID                 |
