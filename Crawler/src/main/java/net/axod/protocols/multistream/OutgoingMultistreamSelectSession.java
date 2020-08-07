@@ -26,6 +26,7 @@ public class OutgoingMultistreamSelectSession {
 
 	public final static String PROTO_ID = "/ipfs/id/1.0.0\n";
 	public final static String PROTO_DHT = "/ipfs/kad/1.0.0\n";
+	public final static String PROTO_BITSWAP = "/ipfs/bitswap/1.2.0\n";
 
 	public String proto = null;
 	public boolean handshaked = false;

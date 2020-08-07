@@ -55,7 +55,7 @@ public class IPFSIOPlugin extends IOPlugin {
 	OutgoingMultistreamSelectSession multi_yamux = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_YAMUX);
 	
 	ByteBuffer yamuxInbuffer = ByteBuffer.allocate(200000);
-	YamuxSession yamux = new YamuxSession(new HandlerIncomingFactory());	
+	YamuxSession yamux = new YamuxSession(new HandlerIncomingFactory(this));	
 	boolean sentInitYamux = false;
 
 	// My RSA keys
@@ -184,61 +184,11 @@ public class IPFSIOPlugin extends IOPlugin {
 	public void processYamuxPackets(ByteBuffer inbuff) throws Exception {
 		ByteBuffer yo = ByteBuffer.allocate(8192);	// For ping replies etc...
 		yamux.process(inbuff, yo);
-/*
-		// Temporary until we get handlers setup...
-		ByteBuffer in2 = yamux.getInputBuffer(2);
-		if (in2!=null) {
-			handleIncomingId(2, in2);	
-		}
-*/
+
 		// Now we need to send anything that yamux wanted to send...
 		if (yo.position()>0) {
 			logger.fine("Yamux sending data... " + yo.position());
 			secio.write(out, yo);		// Write it out...
 		}
 	}
-
-/*
-	public void handleIncomingId(int m_stream, ByteBuffer inbuffp) throws Exception {		
-		inbuffp.flip();
-		while(inbuffp.remaining()>0) {
-			String l = OutgoingMultistreamSelectSession.readMultistream(inbuffp);								
-
-			if (l.equals("/multistream/1.0.0\n")) {
-				writeYamuxMultistreamEnc("/multistream/1.0.0\n", m_stream, (short)2);
-				writeYamuxMultistreamEnc("/ipfs/id/1.0.0\n", m_stream, (short)0);
-
-			} else if (l.equals("/ipfs/id/1.0.0\n")) {
-				String local_peerID = KeyManager.getPeerID(secio.getLocalPublicKey()).toString();
-				String remote_peerID = KeyManager.getPeerID(secio.getRemotePublicKey()).toString();
-
-				byte[] multi_data2 = IdentifyPlugin.getIdentify(secio.getLocalPublicKey(), local_peerID, remote_peerID);
-				// Write it to the output
-				ByteBuffer bbo = ByteBuffer.allocate(8192);
-				YamuxSession.writeYamux(bbo, multi_data2, m_stream, (short)0);
-				secio.write(out, bbo);		// Write it out...
-			}
-		}
-		inbuffp.compact();
-	}
-
-	private void writeYamuxMultistreamEnc(String d, int m_stream, short m_flags) {
-		try {
-			ByteBuffer bbm = ByteBuffer.allocate(8192);
-			OutgoingMultistreamSelectSession.writeMultistream(bbm, d);		
-			bbm.flip();
-			byte[] multi_data = new byte[bbm.remaining()];
-			bbm.get(multi_data);
-	
-			ByteBuffer bbo = ByteBuffer.allocate(8192);
-			YamuxSession.writeYamux(bbo, multi_data, m_stream, m_flags);
-			bbo.flip();
-			byte[] data = new byte[bbo.remaining()];
-			bbo.get(data);		
-			secio.write(out, data);
-		} catch(SecioException se) {
-			// For now, we don't care...			
-		}
-	}
-*/
 }

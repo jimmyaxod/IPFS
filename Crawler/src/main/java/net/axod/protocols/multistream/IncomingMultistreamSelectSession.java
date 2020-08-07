@@ -18,6 +18,10 @@ public class IncomingMultistreamSelectSession {
     private boolean recv_multistream = false;
     private String recv_protocol = null;
 
+    public String getProtocol() {
+    	return recv_protocol;	
+    }
+    
     public void reset() {
     	handshaked = false;
     	recv_multistream = false;
@@ -53,6 +57,7 @@ public class IncomingMultistreamSelectSession {
 					if (recv_multistream) {
 						// We have a proposed protocol...
 						recv_protocol = l;
+						break;
 					}
 					
 					// For now, we only support multistream/1.0.0
@@ -77,11 +82,11 @@ public class IncomingMultistreamSelectSession {
 	
     public void sendAccept(ByteBuffer out) {
 		OutgoingMultistreamSelectSession.writeMultistream(out, recv_protocol);
-		handshaked = true;    	
+		handshaked = true;
     }
     
     public void sendReject(ByteBuffer out) {
 		OutgoingMultistreamSelectSession.writeMultistream(out, OutgoingMultistreamSelectSession.PROTO_NA);
 		handshaked = true;
     }
-}                             
+} 
