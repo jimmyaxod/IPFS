@@ -17,6 +17,10 @@ import java.security.interfaces.*;
 import javax.crypto.*;
 import javax.crypto.spec.*;
 
+import org.bouncycastle.jce.provider.*;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 
 /**
  * A Secio session handles SECIO
@@ -54,6 +58,10 @@ public class SecioSession {
 	private Cipher incoming_cipher;
 	private Cipher outgoing_cipher;
 
+	static {
+		Security.addProvider(new BouncyCastleProvider());
+	}
+	
 	
 	/**
 	 *
@@ -188,24 +196,45 @@ public class SecioSession {
 			// TODO: Make sure it's an RSA key...
 			PeerKeyProtos.KeyType keytype = pka.getType();
 			//System.out.println("keytype " + keytype);
+
+			byte[] keybytes = pka.getData().toByteArray();
 			
-			if (keytype != PeerKeyProtos.KeyType.RSA) {
+			PublicKey pk = null;
+			Signature verify = null;
+			
+			if (keytype == PeerKeyProtos.KeyType.RSA) {
+				pk = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(keybytes));
+				verify = Signature.getInstance("SHA256withRSA");
+			} else if (keytype == PeerKeyProtos.KeyType.ECDSA) {
+				pk = KeyFactory.getInstance("ECDSA").generatePublic(new X509EncodedKeySpec(keybytes));
+				verify = Signature.getInstance("SHA256withECDSA");
+			} else if (keytype == PeerKeyProtos.KeyType.Ed25519) {
+				// Wrap public key in ASN.1 format so we can use X509EncodedKeySpec to read it
+				SubjectPublicKeyInfo pubKeyInfo = new SubjectPublicKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), keybytes);
+				X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(pubKeyInfo.getEncoded());
+				pk = KeyFactory.getInstance("Ed25519").generatePublic(x509KeySpec);
+				
+				
+//				pk = KeyFactory.getInstance("Ed25519").generatePublic(new X509EncodedKeySpec(keybytes));
+				verify = Signature.getInstance("Ed25519");				
+			} else {
+				System.out.println("NEWKEYTYPE " + keytype);
 				throw (new SecioException("Unsupported key " + keytype));
 			}
-
-			byte[] keybytes = pka.getData().toByteArray();		
-			PublicKey pk = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(keybytes));
-
-			// TODO: Do we need to support others?
-			Signature verify = Signature.getInstance("SHA256withRSA");
+			
 			verify.initVerify(pk);
 			verify.update(remote_propose.toByteArray());
 			verify.update(local_propose.toByteArray());
 			verify.update(remote_exchange.getEpubkey().toByteArray());
-			return verify.verify(remote_exchange.getSignature().toByteArray());
+			boolean r = verify.verify(remote_exchange.getSignature().toByteArray());
+
+			System.out.println("Secio.checkSignature.result " + keytype + " " + r);
+			
+			return r;
 		} catch(SecioException se) {
 			throw(se);
 		} catch(Exception e) {
+			System.out.println("ERROR CHECKSIGNATURE " + e);
 			throw(new SecioException("Error checking signature " + e));
 		} finally {
 			Timing.leave("Secio.checkSignature");
