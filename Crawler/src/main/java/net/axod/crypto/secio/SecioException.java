@@ -1,4 +1,4 @@
-package net.axod.crypto;
+package net.axod.crypto.secio;
 
 public class SecioException extends Exception {
 

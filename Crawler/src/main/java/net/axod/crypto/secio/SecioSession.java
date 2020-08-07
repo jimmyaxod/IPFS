@@ -1,4 +1,4 @@
-package net.axod.crypto;
+package net.axod.crypto.secio;
 
 import net.axod.*;
 import net.axod.util.*;
