@@ -17,6 +17,8 @@ public class YamuxSession {
 
 	private HashSet notSentSYN = new HashSet();
 	
+	private int outgoingStreamID = 3;			// NB Must be odd.
+
 	private static final byte YAMUX_TYPE_DATA = 0;
 	private static final byte YAMUX_TYPE_WINDOW_UPDATE = 1;
 	private static final byte YAMUX_TYPE_PING = 2;
@@ -30,6 +32,11 @@ public class YamuxSession {
 	public YamuxSession() {
 	}
 
+	public void setupOutgoingStream(IOPlugin iop) {
+		setupOutgoingStream(outgoingStreamID, iop);
+		outgoingStreamID+=2;
+	}
+	
 	public void setupOutgoingStream(int id, IOPlugin iop) {
 		// For an outgoing stream, we should send a SYN on the first packet...
 		logger.fine("Yamux setting up new stream " + id);
@@ -62,7 +69,7 @@ public class YamuxSession {
 				if (m_type==YAMUX_TYPE_WINDOW_UPDATE || m_type==YAMUX_TYPE_DATA) {
 					if ((m_flags & YAMUX_FLAG_SYN) == YAMUX_FLAG_SYN) {
 						// New stream...
-						System.err.println("Yamux incoming stream " + m_stream);
+//						System.err.println("Yamux incoming stream " + m_stream);
 						// TODO...
 					}
 				}
@@ -82,7 +89,7 @@ public class YamuxSession {
 					IOPlugin iop = (IOPlugin)activeIOPlugins.get(m_stream);
 					if (iop==null) {
 						// ERROR!
-						System.err.println("Yamux no stream with id " + m_stream);
+//						System.err.println("Yamux no stream with id " + m_stream);
 					} else {
 						iop.in.put(d);
 						logger.fine("Yamux got data " + iop.in.position() + " for stream " + m_stream);

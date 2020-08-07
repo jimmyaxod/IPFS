@@ -168,13 +168,13 @@ public class IPFSIOPlugin extends IOPlugin {
 
 	private void initYamuxStreams() {		
 		// Start with an IPFS/ID stream.
-		yamux.setupOutgoingStream(3, new HandlerIPFSID(this));
+		yamux.setupOutgoingStream(new HandlerIPFSID(this));
 	}
 
 	//
 	public void openDHTStream() {
-		System.out.println("TODO: Open DHT Stream...");	
-		yamux.setupOutgoingStream(5, new HandlerKADDHT(this));
+		// Once we've done IPFS ID, lets open an outgoing KAD DHT stream.
+		yamux.setupOutgoingStream(new HandlerKADDHT(this));
 	}
 	
 	/**
@@ -185,7 +185,6 @@ public class IPFSIOPlugin extends IOPlugin {
 		ByteBuffer yo = ByteBuffer.allocate(8192);	// For ping replies etc...
 		yamux.process(inbuff, yo);
 /*
-		
 		// Temporary until we get handlers setup...
 		ByteBuffer in2 = yamux.getInputBuffer(2);
 		if (in2!=null) {
@@ -222,7 +221,6 @@ public class IPFSIOPlugin extends IOPlugin {
 		}
 		inbuffp.compact();
 	}
-*/
 
 	private void writeYamuxMultistreamEnc(String d, int m_stream, short m_flags) {
 		try {
@@ -242,5 +240,5 @@ public class IPFSIOPlugin extends IOPlugin {
 			// For now, we don't care...			
 		}
 	}
-	
+*/
 }

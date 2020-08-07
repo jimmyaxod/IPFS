@@ -26,6 +26,7 @@ public class Crawl implements IOCoreListener {
 	
 	public static HashSet currentConnectedHosts = new HashSet();
 	
+	private static int max_size = 100;
 	
 	/**
 	 *
@@ -41,14 +42,25 @@ public class Crawl implements IOCoreListener {
 			io = new IOCore(new Crawl());		// IOCoreListener
 
 			// Try an outgoing connection...
-	
-			Node dest = new Node(new InetSocketAddress("127.0.0.1", 4001));
-			dest.properties.put("host", "127.0.0.1");
-			logger.info("Attempting connection to " + dest + "...");
 
-			IOPluginFactory iof = new IPFSIOPluginFactory();
-			boolean suc = io.addConnection(dest, iof, null);
-			System.out.println("connection ok? " + suc);
+			for(int i=0;i<args.length;i++) {
+				if (args[i].equals("--max")) {
+					i++;
+					max_size = Integer.parseInt(args[i]);
+				} else if (args[i].equals("--dest")) {
+					i++;
+					String host = args[i];
+					i++;
+					int port = Integer.parseInt(args[i]);
+					Node dest = new Node(new InetSocketAddress(host, port));
+					dest.properties.put("host", "127.0.0.1");
+					logger.info("Attempting connection to " + dest + "...");
+		
+					IOPluginFactory iof = new IPFSIOPluginFactory();
+					boolean suc = io.addConnection(dest, iof, null);
+					System.out.println("connection ok? " + suc);
+				}
+			}
 
 			// Make a main status loop...
 			while(true) {
@@ -112,7 +124,7 @@ public class Crawl implements IOCoreListener {
 	}
 
 	public static void addConnection(MultiAddress ma) {
-		if (currentConnectedHosts.size()>500) return;		// 500 max for now
+		if (currentConnectedHosts.size()>max_size) return;		// 500 max for now
 
 		if (!ma.isTCPIP()) return;
 		String host = ma.getHost();
@@ -143,7 +155,8 @@ public class Crawl implements IOCoreListener {
 			}
 			//System.out.println("connection ok? " + suc);
 		} catch(Exception e) {
-			System.err.println("Connect failed");	
+			System.err.println("Connect failed " + host + " port " + port);
+			e.printStackTrace();
 			unregisterConnection(host);	
 		}
 	}

@@ -35,7 +35,7 @@ public class HandlerKADDHT extends IOPlugin {
 	private long PERIOD_PING = 10*1000;
 
 	private long lastQueryTime = 0;
-	private long PERIOD_QUERY = 4*1000;
+	private long PERIOD_QUERY = 2*1000;
 
 	public boolean wantsToWork() {
     	if (!sent_handshake) {
