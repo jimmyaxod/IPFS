@@ -3,6 +3,7 @@ package net.axod.ipfscrawl;
 import net.axod.pb.*;
 import net.axod.io.*;
 import net.axod.protocols.*;
+import net.axod.protocols.plugins.*;
 import net.axod.protocols.multistream.*;
 import net.axod.crypto.secio.*;
 import net.axod.crypto.keys.*;
@@ -147,12 +148,12 @@ public class IPFSIOPlugin extends IOPlugin {
 				}
 				
 				Multihash h = new Multihash(Multihash.Type.sha2_256, digest);														
-				
+
 				DHTProtos.Message msg = DHTProtos.Message.newBuilder()
 								.setType(DHTProtos.Message.MessageType.FIND_NODE)
 								.setKey(ByteString.copyFromUtf8(h.toString()))
 								.build();
-	
+
 				// OK now lets send it...
 				byte[] multi_data = msg.toByteArray();
 				ByteBuffer vo = ByteBuffer.allocate(8192);
@@ -268,34 +269,9 @@ public class IPFSIOPlugin extends IOPlugin {
 				String local_peerID = KeyManager.getPeerID(secio.getLocalPublicKey()).toString();
 				String remote_peerID = KeyManager.getPeerID(secio.getRemotePublicKey()).toString();
 
-				MultiAddress listen1 = new MultiAddress("/ip4/86.171.62.88/tcp/3399");
-				MultiAddress observed1 = new MultiAddress("/ip4/86.171.62.88/tcp/3399");	// TODO: Fix
-
-				IPFSProtos.Identify id = IPFSProtos.Identify.newBuilder()
-							 .setProtocolVersion("ipfs/0.1.0")
-							 .setAgentVersion("mindYourOwnBusiness/0.0.1")
-							 .setPublicKey(ByteString.copyFrom(secio.getLocalPublicKey()))
-							 .addListenAddrs(ByteString.copyFrom(listen1.getBytes()))
-							 .setObservedAddr(ByteString.copyFrom(observed1.getBytes()))		// TODO: Fix this...
-							 .addProtocols("/ipfs/id/1.0.0")
-							 .addProtocols("/ipfs/kad/1.0.0")
-							 .addProtocols("/x/")
-							 .addProtocols("/ipfs/dht")
-							 .addProtocols("/ipfs/ping/1.0.0")
-							 .build();
-
-				//System.out.println("Identify " + id);
-							 
-				byte[] multi_data = id.toByteArray();
-				ByteBuffer vo = ByteBuffer.allocate(8192);
-				OutgoingMultistreamSelectSession.writeVarInt(vo, multi_data.length);
-				vo.put(multi_data);
-				vo.flip();
-				byte[] multi_data2 = new byte[vo.remaining()];
-				vo.get(multi_data2);
-				
+				byte[] multi_data2 = IdentifyPlugin.getIdentify(secio.getLocalPublicKey(), local_peerID, remote_peerID);				
 				ByteBuffer bbo = ByteBuffer.allocate(8192);
-				
+
 				YamuxSession.writeYamux(bbo, multi_data2, m_stream, (short)0);
 				secio.write(out, bbo);		// Write it out...
 			}
@@ -335,7 +311,7 @@ public class IPFSIOPlugin extends IOPlugin {
 				inbuffp.flip();
 				
 				IPFSProtos.Identify ident = IPFSProtos.Identify.parseFrom(idd);
-				
+
 				//System.out.println("IDENT " + ident);
 /*
 				Iterator j = ident.getListenAddrsList().iterator();
@@ -346,7 +322,7 @@ public class IPFSIOPlugin extends IOPlugin {
 					System.out.println(ma);
 				}
 */
-				
+
 				// That's their ID
 				String agentVersion = ident.getAgentVersion();
 				String protocolVersion = ident.getProtocolVersion();
@@ -478,21 +454,5 @@ public class IPFSIOPlugin extends IOPlugin {
 	public void closing() {
 		logger.fine("Connection closing...");
         Crawl.unregisterConnection(host);
-	}
-
-	private static void showHexData(byte[] d) {
-		int o = 0;
-		while(true) {
-			String l = "";
-			for(int i=0;i<Math.min(16, d.length - o); i++) {
-				String ch = "00" + Integer.toString(((int)d[o+i]) & 0xff, 16);
-				ch = ch.substring(ch.length() - 2, ch.length());
-				l += " " + ch;
-			}
-			System.out.println(" " + l);
-			o+=16;
-			if (o>=d.length) break;
-		}
-	}
-	
+	}	
 }
