@@ -3,6 +3,13 @@ Playing with IPFS
 
 For now, this will be limited to TCP transport. I'm going to be looking at the DHT.
 
+* multistream_select (DONE)
+* Secio (DONE)
+* Yamux multiplexing (DONE)
+* Crawling the DHT by random walk (DONE)
+* Listening for requests by operating in 'server' mode on the DHT (TODO)
+
+
 ## multistream
     
 First off, we need to handshake with multistream-select
