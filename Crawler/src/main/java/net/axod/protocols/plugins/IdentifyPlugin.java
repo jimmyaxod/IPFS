@@ -33,8 +33,6 @@ public class IdentifyPlugin {
 					 .addProtocols("/ipfs/dht")
 					 .addProtocols("/ipfs/ping/1.0.0")
 					 .build();
-
-		//System.out.println("Identify " + id);
 					 
 		byte[] multi_data = id.toByteArray();
 		ByteBuffer vo = ByteBuffer.allocate(8192);

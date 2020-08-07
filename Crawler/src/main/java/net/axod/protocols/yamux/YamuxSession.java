@@ -60,6 +60,9 @@ public class YamuxSession {
 				short m_flags = in.getShort();
 				int m_stream = in.getInt();
 				int m_length = in.getInt();
+				
+				//System.out.println("Yamux packet ver=" + m_ver + " type=" + m_type + " flags=" + m_flags + " stream=" + m_stream + " len=" + m_length);
+				
 				if (m_type==YAMUX_TYPE_WINDOW_UPDATE || m_type==YAMUX_TYPE_DATA) {
 					if ((m_flags & YAMUX_FLAG_SYN) == YAMUX_FLAG_SYN) {
 						// New stream...

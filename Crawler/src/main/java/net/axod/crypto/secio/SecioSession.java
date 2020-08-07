@@ -493,11 +493,11 @@ public class SecioSession {
 							throw new SecioException("Secio nonce does NOT match");
 						}
 
+						got_enc_nonce = true;
+						
 						// Now we will send our own...
 						write(out, remote_propose.getRand().toByteArray());
-						logger.fine("Sent our encrypted signed nonce");
-								
-						got_enc_nonce = true;
+						logger.fine("Sent our encrypted signed nonce");								
 					} else {
 						// Add the message to our return list...
 						inq.add(plainText);
