@@ -5,6 +5,7 @@ import net.axod.io.*;
 import net.axod.protocols.*;
 import net.axod.protocols.plugins.*;
 import net.axod.protocols.multistream.*;
+import net.axod.protocols.yamux.*;
 import net.axod.crypto.secio.*;
 import net.axod.crypto.keys.*;
 import net.axod.util.*;
@@ -212,10 +213,7 @@ public class IPFSIOPlugin extends IOPlugin {
 		if (multi_yamux.process(yamuxInbuffer, outbuff)) {
 			if (!sentInitYamux) {
 				// Start up a new yamux stream...
-				
-				writeYamuxMultistreamEnc("/multistream/1.0.0\n", 3, (short)1);
-				writeYamuxMultistreamEnc("/ipfs/id/1.0.0\n", 3, (short)0);	
-				yamux.setupStream(3);
+				initYamuxStreams();
 				sentInitYamux = true;
 			}
 			processYamuxPackets(yamuxInbuffer);
@@ -231,6 +229,19 @@ public class IPFSIOPlugin extends IOPlugin {
 		}
 	}	
 
+	public void closing() {
+		logger.fine("Connection closing...");
+        Crawl.unregisterConnection(host);
+	}	
+
+	// ==== Under here needs tidyup
+
+	private void initYamuxStreams() {
+		writeYamuxMultistreamEnc("/multistream/1.0.0\n", 3, (short)1);
+		writeYamuxMultistreamEnc("/ipfs/id/1.0.0\n", 3, (short)0);	
+		yamux.setupStream(3);
+	}
+	
 	/**
 	 * Deal with Yamux packets...
 	 *
@@ -302,26 +313,17 @@ public class IPFSIOPlugin extends IOPlugin {
 			// Read a varint
 			try {
 				int ll = (int)OutgoingMultistreamSelectSession.readVarInt(inbuffp);
-	
+
 				byte[] idd = new byte[ll];
 				inbuffp.get(idd);
 
 				// Progress...
 				inbuffp.compact();
 				inbuffp.flip();
-				
+
 				IPFSProtos.Identify ident = IPFSProtos.Identify.parseFrom(idd);
 
 				//System.out.println("IDENT " + ident);
-/*
-				Iterator j = ident.getListenAddrsList().iterator();
-				while(j.hasNext()) {
-					byte[] bb = ((ByteString)j.next()).toByteArray();
-					System.out.println("Addr " + ByteUtil.toHexString(bb));
-					MultiAddress ma = new MultiAddress(bb);
-					System.out.println(ma);
-				}
-*/
 
 				// That's their ID
 				String agentVersion = ident.getAgentVersion();
@@ -451,8 +453,4 @@ public class IPFSIOPlugin extends IOPlugin {
 		}
 	}
 	
-	public void closing() {
-		logger.fine("Connection closing...");
-        Crawl.unregisterConnection(host);
-	}	
 }

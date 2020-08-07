@@ -1,4 +1,4 @@
-package net.axod.protocols;
+package net.axod.protocols.yamux;
 
 import java.util.*;
 import java.util.logging.*;
@@ -31,7 +31,7 @@ public class YamuxSession {
 	public void setupStream(int id) {
 		logger.fine("Yamux setting up new stream " + id);
 		if (activeInbuffers.containsKey(id)) {
-			// ERROR!	
+			// ERROR!
 		}
 		ByteBuffer in = ByteBuffer.allocate(BUFFER_SIZE_IN);
 		activeInbuffers.put(id, in);		
