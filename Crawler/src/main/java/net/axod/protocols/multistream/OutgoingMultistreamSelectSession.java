@@ -20,6 +20,7 @@ public class OutgoingMultistreamSelectSession {
     private static Logger logger = Logger.getLogger("net.axod.protocols");
 	public final static String MULTISTREAM = "/multistream/1.0.0\n";
 
+	public final static String PROTO_NA = "na\n";
 	public final static String PROTO_SECIO = "/secio/1.0.0\n";
 	public final static String PROTO_YAMUX = "/yamux/1.0.0\n";
 
