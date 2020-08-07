@@ -11,17 +11,18 @@ For now, this will be limited to TCP transport. I'm going to be looking at the D
 
 Top versions from a crawl
 
-| Count | Version ID |
-| 1520 | storm |
-| 1310 | go-ipfs/0.4.20/ |
-| 1051 | go-ipfs/0.4.22/ |
-| 283 | go-ipfs/0.6.0/ |
-| 179 | go-ipfs/0.4.23/ |
-| 126 | go-ipfs/0.5.1/ |
-| 126 | go-ipfs/0.4.21/ |
-| 109 | go-ipfs/0.6.0/d6e036a |
-| 65 | go-ipfs/0.5.0/ |
-| 35 | go-ipfs/0.5.1/8431e2e87 |
+| Count | Version ID                 |
+| ----- | -------------------------- |
+|  1520 | storm                      |
+|  1310 | go-ipfs/0.4.20/            |
+|  1051 | go-ipfs/0.4.22/            |
+|   283 | go-ipfs/0.6.0/             |
+|   179 | go-ipfs/0.4.23/            |
+|   126 | go-ipfs/0.5.1/             |
+|   126 | go-ipfs/0.4.21/            |
+|   109 | go-ipfs/0.6.0/d6e036a      |
+|    65 | go-ipfs/0.5.0/             |
+|    35 | go-ipfs/0.5.1/8431e2e87    |
 
 
 ## multistream
