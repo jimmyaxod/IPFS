@@ -19,17 +19,38 @@ Top versions from a crawl
 
 | Count | Version ID                 |
 | ----- | -------------------------- |
-|  1520 | storm                      |
-|  1310 | go-ipfs/0.4.20/            |
-|  1051 | go-ipfs/0.4.22/            |
-|   283 | go-ipfs/0.6.0/             |
-|   179 | go-ipfs/0.4.23/            |
-|   126 | go-ipfs/0.5.1/             |
-|   126 | go-ipfs/0.4.21/            |
-|   109 | go-ipfs/0.6.0/d6e036a      |
-|    65 | go-ipfs/0.5.0/             |
-|    35 | go-ipfs/0.5.1/8431e2e87    |
+|  1263 | go-ipfs/0.4.20/            |
+|   903 | go-ipfs/0.4.22/            |
+|   868 | storm                      |
+|   274 | go-ipfs/0.6.0/             |
+|   171 | go-ipfs/0.4.23/            |
+|   139 | go-ipfs/0.5.1/             |
+|   129 | hydra-booster/0.4.3        |
+|   123 | go-ipfs/0.4.21/            |
+|   103 | go-ipfs/0.6.0/d6e036a      |
+|    80 | dhtbooster/2               |
+|    56 | go-ipfs/0.5.0/             |
+|    37 | go-ipfs/0.6.0/d6e036a88    |
+|    30 | go-ipfs/0.4.23/5b1687d     |
+|    26 | go-ipfs/0.4.17/            |
+|    25 | go-ipfs/0.4.18/            |
+|    17 | go-ipfs/0.5.1/8431e2e87    |
+|    16 | go-ipfs/0.6.0-rc7/2041cea  |
+|    14 | go-ipfs/0.4.19/            |
+|    12 | go-ipfs/0.6.0-rc6/f177fdd  |
+|    12 | go-ipfs/0.4.23/6ce9a35     |
 
+Incoming Yamux protocol negotiations (TODO)
+
+| count | protocol                   |
+| ----- | -------------------------- |
+|     5 | /floodsub/1.0.0            |
+|     9 | /ipfs/bitswap/1.1.0        |
+|     4 | /ipfs/bitswap/1.2.0        |
+|   637 | /ipfs/id/1.0.0             |
+|   103 | /ipfs/kad/1.0.0            |
+|   101 | /libp2p/circuit/relay/0.1.0 |
+|     2 | /meshsub/1.0.0             |
 
 ## multistream
     
