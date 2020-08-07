@@ -298,7 +298,7 @@ public class IPFSIOPlugin extends IOPlugin {
 				}
 				
 				byte[] pubkey = secio.getRemotePublicKey();
-	
+
 				long now = System.currentTimeMillis();
 				Crawl.outputs.writeFile("ids", now + "," + host + "," + KeyManager.getPeerID(pubkey) + "," + agentVersion + "," + protocolVersion + "," + protocols + "\n");
 				

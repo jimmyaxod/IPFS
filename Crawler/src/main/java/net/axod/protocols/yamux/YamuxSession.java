@@ -28,6 +28,16 @@ public class YamuxSession {
 	public YamuxSession() {
 	}
 	
+	public void setupIncomingStream(int id) {
+		// For an incoming stream, we should send an ACK on the first packet...
+		setupStream(id);
+	}
+	
+	public void setupOutgoingStream(int id) {
+		// For an outgoing stream, we should send a SYN on the first packet...
+		setupStream(id);
+	}
+
 	public void setupStream(int id) {
 		logger.fine("Yamux setting up new stream " + id);
 		if (activeInbuffers.containsKey(id)) {
@@ -49,7 +59,7 @@ public class YamuxSession {
 	 * Process data
 	 *
 	 * @param	in	Input buffer
-	 * @param	out	Output buffer we can write to
+	 * @param	out	Output buffer
 	 */
 	public void process(ByteBuffer in, ByteBuffer out) {
 		in.flip();
@@ -66,7 +76,7 @@ public class YamuxSession {
 				if (m_type==YAMUX_TYPE_WINDOW_UPDATE || m_type==YAMUX_TYPE_DATA) {
 					if ((m_flags & YAMUX_FLAG_SYN) == YAMUX_FLAG_SYN) {
 						// New stream...
-						setupStream(m_stream);
+						setupIncomingStream(m_stream);
 					}
 				}
 				
@@ -96,9 +106,9 @@ public class YamuxSession {
 				} else if (m_type==YAMUX_TYPE_PING) {
 					// Send a ping back...
 					byte[] dummy = new byte[0];
-					writeYamux(out, dummy, YAMUX_TYPE_PING, m_stream, (short)2);					
+					writeYamux(out, dummy, YAMUX_TYPE_PING, m_stream, YAMUX_FLAG_ACK);
 				} else if (m_type==YAMUX_TYPE_GO_AWAY) {
-
+					// TODO: Handle this
 				}
 			} catch(BufferUnderflowException bue) {
 				in.rewind();		// Try again later...
@@ -109,13 +119,21 @@ public class YamuxSession {
 		}
 		in.compact();
 		
-		// See if we should write anything out
+		// TODO: See if we should write anything out
 	}
 
+	/**
+	 * Write
+	 *
+	 */
 	public static void writeYamux(ByteBuffer dest, byte[] multi_data, int m_stream, short m_flags) {
 		writeYamux(dest, multi_data, 0, m_stream, m_flags);
 	}
 
+	/**
+	 * Write a yamux packet out
+	 *
+	 */
 	public static void writeYamux(ByteBuffer dest, byte[] multi_data, int m_type, int m_stream, short m_flags) {
 		dest.put((byte)0);			// ver
 		dest.put((byte)m_type);		// type
