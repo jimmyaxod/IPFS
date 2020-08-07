@@ -7,6 +7,8 @@ import net.axod.protocols.multistream.*;
 import net.axod.crypto.secio.*;
 import net.axod.crypto.keys.*;
 import net.axod.util.*;
+import net.axod.measurement.*;
+
 
 import com.google.protobuf.*;
 import com.google.protobuf.util.*;
@@ -17,7 +19,6 @@ import io.ipfs.multiaddr.*;
 import java.net.*;                             
 import java.nio.*;
 import java.util.*;
-import java.util.concurrent.atomic.*;
 import java.security.*;
 import java.math.*;
 import java.security.spec.*;
@@ -66,60 +67,6 @@ public class IPFSIOPlugin extends IOPlugin {
 		mykeys = KeyManager.getKeys();
 	}
 	
-	// Some stats...
-	static long total_sent_pings = 0;
-	static long total_sent_find_node = 0;
-
-	static HashMap total_recv_types = new HashMap();
-	
-	private static void incRecvType(String type) {
-		AtomicLong al = (AtomicLong)total_recv_types.get(type);
-		if (al==null) {
-			al = new AtomicLong(0);
-			total_recv_types.put(type, al);
-		}
-		al.incrementAndGet();
-	}
-	
-	public static void showStatus() {
-		System.out.println("IPFSIOPlugin sent_pings=" + total_sent_pings
-			                         + " sent_find_node=" + total_sent_find_node);
-
-		Iterator i = total_recv_types.keySet().iterator();
-		while(i.hasNext()) {
-			String type = (String)i.next();
-			AtomicLong al = (AtomicLong)total_recv_types.get(type);
-			System.out.println("IPFSIOPlugin recv " + type + " " + al.longValue());
-		}
-	}
-	
-	/**
-	 * Given a public key, we can get a Multihash which shows the PeerID in a
-	 * more usable format.
-	 *
-	 */
-	public Multihash getPeerID(byte[] pubkey) {
-		Multihash h;
-
-		// Let's work out their ID...
-		if (pubkey.length<=42) {
-			// Use identity multihash
-			h = new Multihash(Multihash.Type.id, pubkey);
-		} else {
-			// Use sha2-256
-			try {
-				MessageDigest md = MessageDigest.getInstance("SHA-256");
-				md.update(pubkey);
-				byte[] digest = md.digest();
-				h = new Multihash(Multihash.Type.sha2_256, digest);
-				
-			} catch (NoSuchAlgorithmException e) {
-				throw new RuntimeException(e.getMessage(), e);
-			}								
-		}
-		return h;
-	}
-
 	/**
 	 * Create a new plugin to handle a connection.
 	 *
@@ -186,7 +133,7 @@ public class IPFSIOPlugin extends IOPlugin {
 				ByteBuffer bbo = ByteBuffer.allocate(8192);
 				YamuxSession.writeYamux(bbo, multi_data2, dht_stream, (short)0);
 				secio.write(out, bbo);		// Write it out...
-				total_sent_pings++;
+				DHTMetrics.incSentType(DHTProtos.Message.MessageType.PING.toString());
 			} catch(SecioException se) {}
 			lastPingTime = now;	
 		}
@@ -217,7 +164,7 @@ public class IPFSIOPlugin extends IOPlugin {
 				ByteBuffer bbo = ByteBuffer.allocate(8192);
 				YamuxSession.writeYamux(bbo, multi_data2, dht_stream, (short)0);
 				secio.write(out, bbo);		// Write it out...
-				total_sent_find_node++;
+				DHTMetrics.incSentType(DHTProtos.Message.MessageType.FIND_NODE.toString());
 			} catch(SecioException se) {}
 
 			lastQueryTime = now;
@@ -318,8 +265,8 @@ public class IPFSIOPlugin extends IOPlugin {
 				writeYamuxMultistreamEnc("/ipfs/id/1.0.0\n", m_stream, (short)0);
 
 			} else if (l.equals("/ipfs/id/1.0.0\n")) {
-				String local_peerID = getPeerID(secio.getLocalPublicKey()).toString();
-				String remote_peerID = getPeerID(secio.getRemotePublicKey()).toString();
+				String local_peerID = KeyManager.getPeerID(secio.getLocalPublicKey()).toString();
+				String remote_peerID = KeyManager.getPeerID(secio.getRemotePublicKey()).toString();
 
 				MultiAddress listen1 = new MultiAddress("/ip4/86.171.62.88/tcp/3399");
 				MultiAddress observed1 = new MultiAddress("/ip4/86.171.62.88/tcp/3399");	// TODO: Fix
@@ -414,7 +361,7 @@ public class IPFSIOPlugin extends IOPlugin {
 				byte[] pubkey = secio.getRemotePublicKey();
 	
 				long now = System.currentTimeMillis();
-				Crawl.outputs.writeFile("ids", now + "," + host + "," + getPeerID(pubkey) + "," + agentVersion + "," + protocolVersion + "," + protocols + "\n");
+				Crawl.outputs.writeFile("ids", now + "," + host + "," + KeyManager.getPeerID(pubkey) + "," + agentVersion + "," + protocolVersion + "," + protocols + "\n");
 				
 				//System.out.println("Starting a new stream, kad...");
 				writeYamuxMultistreamEnc("/multistream/1.0.0\n", 7, (short)1);
@@ -464,7 +411,7 @@ public class IPFSIOPlugin extends IOPlugin {
 				
 				DHTProtos.Message msg = DHTProtos.Message.parseFrom(idd);
 	
-				incRecvType(msg.getType().toString());
+				DHTMetrics.incRecvType(msg.getType().toString());
 				
 				String msg_json = JsonFormat.printer().print(msg);
 				long now2 = System.currentTimeMillis();

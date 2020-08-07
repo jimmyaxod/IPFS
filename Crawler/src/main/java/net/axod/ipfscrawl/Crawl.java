@@ -2,6 +2,7 @@ package net.axod.ipfscrawl;
 
 import net.axod.io.*;
 import net.axod.util.*;
+import net.axod.measurement.*;
 
 import java.net.*;
 import java.util.*;
@@ -54,7 +55,7 @@ public class Crawl implements IOCoreListener {
 				if (System.currentTimeMillis() - lastStatus > PERIOD_STATUS) {
 					logger.info("STATUS " + io);
 					logger.info("STATUS currentConnectedHosts " + currentConnectedHosts.size() + " recentConnectedHosts " + recentConnectedHosts.size());
-					IPFSIOPlugin.showStatus();
+					DHTMetrics.showStatus();
 					Timing.showTimings();
 					
 					// Check for issues watchdog
