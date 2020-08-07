@@ -201,7 +201,7 @@ public class SecioSession {
 			
 			PublicKey pk = null;
 			Signature verify = null;
-			
+
 			if (keytype == PeerKeyProtos.KeyType.RSA) {
 				pk = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(keybytes));
 				verify = Signature.getInstance("SHA256withRSA");
@@ -213,28 +213,22 @@ public class SecioSession {
 				SubjectPublicKeyInfo pubKeyInfo = new SubjectPublicKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), keybytes);
 				X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(pubKeyInfo.getEncoded());
 				pk = KeyFactory.getInstance("Ed25519").generatePublic(x509KeySpec);
-				
-				
+
 //				pk = KeyFactory.getInstance("Ed25519").generatePublic(new X509EncodedKeySpec(keybytes));
 				verify = Signature.getInstance("Ed25519");				
 			} else {
 				System.out.println("NEWKEYTYPE " + keytype);
 				throw (new SecioException("Unsupported key " + keytype));
 			}
-			
+
 			verify.initVerify(pk);
 			verify.update(remote_propose.toByteArray());
 			verify.update(local_propose.toByteArray());
 			verify.update(remote_exchange.getEpubkey().toByteArray());
-			boolean r = verify.verify(remote_exchange.getSignature().toByteArray());
-
-			System.out.println("Secio.checkSignature.result " + keytype + " " + r);
-			
-			return r;
+			return verify.verify(remote_exchange.getSignature().toByteArray());
 		} catch(SecioException se) {
 			throw(se);
 		} catch(Exception e) {
-			System.out.println("ERROR CHECKSIGNATURE " + e);
 			throw(new SecioException("Error checking signature " + e));
 		} finally {
 			Timing.leave("Secio.checkSignature");
