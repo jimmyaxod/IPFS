@@ -3,6 +3,34 @@ Playing with IPFS
 
 For now, this will be limited to TCP transport. I'm going to be looking at the DHT.
 
+* multistream_select (DONE)
+* Secio (DONE)
+* Yamux multiplexing (DONE)
+* Crawling the DHT by random walk (DONE)
+* Listening for requests by operating in 'server' mode on the DHT (TODO)
+
+Aims
+ * Insight into who is using IPFS, geography, orgs, etc
+ * Network performance. Monitor latency, connectivity, uptime, average query time, etc
+ * Insight into what content is being shared, individual volumes by hash.
+ * Monitor nefarious use of the network - bot control channel eg 'Storm'
+
+Top versions from a crawl
+
+| Count | Version ID                 |
+| ----- | -------------------------- |
+|  1520 | storm                      |
+|  1310 | go-ipfs/0.4.20/            |
+|  1051 | go-ipfs/0.4.22/            |
+|   283 | go-ipfs/0.6.0/             |
+|   179 | go-ipfs/0.4.23/            |
+|   126 | go-ipfs/0.5.1/             |
+|   126 | go-ipfs/0.4.21/            |
+|   109 | go-ipfs/0.6.0/d6e036a      |
+|    65 | go-ipfs/0.5.0/             |
+|    35 | go-ipfs/0.5.1/8431e2e87    |
+
+
 ## multistream
     
 First off, we need to handshake with multistream-select
@@ -78,4 +106,10 @@ Once this is completed, if you have done everything correctly, you will receive 
     
 These keys have to be created from the above...
     
-TODO: Shared secret and key stretching
+TODO: Document shared secret and key stretching
+
+TODO: Document Yamux multiplexing
+
+TODO: Document ipfs/id Identify messaging
+
+TODO: Document kad DHT messaging
