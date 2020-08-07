@@ -55,7 +55,7 @@ public class IPFSIOPlugin extends IOPlugin {
 	OutgoingMultistreamSelectSession multi_yamux = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_YAMUX);
 	
 	ByteBuffer yamuxInbuffer = ByteBuffer.allocate(200000);
-	YamuxSession yamux = new YamuxSession();	
+	YamuxSession yamux = new YamuxSession(new HandlerIncomingFactory());	
 	boolean sentInitYamux = false;
 
 	// My RSA keys

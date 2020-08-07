@@ -16,9 +16,12 @@ public class YamuxSession {
 	private HashMap activeIOPlugins = new HashMap();
 
 	private HashSet notSentSYN = new HashSet();
+	private HashSet notSentACK = new HashSet();
 	
 	private int outgoingStreamID = 3;			// NB Must be odd.
 
+	private IOPluginFactory iopf = null;
+	
 	private static final byte YAMUX_TYPE_DATA = 0;
 	private static final byte YAMUX_TYPE_WINDOW_UPDATE = 1;
 	private static final byte YAMUX_TYPE_PING = 2;
@@ -29,7 +32,8 @@ public class YamuxSession {
 	private static final short YAMUX_FLAG_FIN = 4;
 	private static final short YAMUX_FLAG_RST = 8;
 
-	public YamuxSession() {
+	public YamuxSession(IOPluginFactory incoming_iopf) {
+		iopf = incoming_iopf;
 	}
 
 	public void setupOutgoingStream(IOPlugin iop) {
@@ -69,6 +73,14 @@ public class YamuxSession {
 				if (m_type==YAMUX_TYPE_WINDOW_UPDATE || m_type==YAMUX_TYPE_DATA) {
 					if ((m_flags & YAMUX_FLAG_SYN) == YAMUX_FLAG_SYN) {
 						// New stream...
+						IOPlugin iop = iopf.getIOPlugin(null, null);			// For now we won't bother with the Node or ISA.
+						
+						if (activeIOPlugins.containsKey(m_stream)) {
+							System.err.println("Yamux already have stream setup for " + m_stream);
+						} else {
+							activeIOPlugins.put(m_stream, iop);	// Store it here...
+							notSentACK.add(m_stream);
+						}                      
 //						System.err.println("Yamux incoming stream " + m_stream);
 						// TODO...
 					}
@@ -132,6 +144,12 @@ public class YamuxSession {
 						flags = YAMUX_FLAG_SYN;
 						notSentSYN.remove(stream_id);
 					}
+
+					if (notSentACK.contains(stream_id)) {
+						flags = YAMUX_FLAG_ACK;
+						notSentACK.remove(stream_id);
+					}
+					
 					writeYamux(out, data, stream_id, flags);
 				}
 			}

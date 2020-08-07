@@ -15,15 +15,20 @@ public class IncomingMultistreamSelectSession {
     private static Logger logger = Logger.getLogger("net.axod.protocols");
 
     private boolean handshaked = false;
-    private boolean sent_multistream = false;
     private boolean recv_multistream = false;
     private String recv_protocol = null;
 
+    public void reset() {
+    	handshaked = false;
+    	recv_multistream = false;
+    	recv_protocol = null;
+    }
+    
 	/**
 	 * Process a multistream select
-	 * OUT 'multistream'
 	 * IN 'multistream'
 	 * IN 'protocol'
+	 * OUT 'multistream'
 	 * OUT 'protocol'		or 'na'
 	 *
 	 * @param	in	Input buffer
@@ -33,31 +38,33 @@ public class IncomingMultistreamSelectSession {
 	 */
 	public String process(ByteBuffer in, ByteBuffer out) {
 		if (!handshaked) {
-			if (!sent_multistream) {
-				OutgoingMultistreamSelectSession.writeMultistream(out, OutgoingMultistreamSelectSession.MULTISTREAM);
-				sent_multistream = true;
-			}
-
-			// We haven't performed the multistream handshake yet, so we should do that now.
 			in.flip();
-			
-			// Try to read a complete packet. If we can't we abort so we can try later.
-			try {
-				String l = OutgoingMultistreamSelectSession.readMultistream(in);	
-				logger.fine("Multistream handshake (" + l.trim() + ")");
-
-				// For now, we only support multistream/1.0.0
-				if (l.equals(OutgoingMultistreamSelectSession.MULTISTREAM)) {
-					// OK, as expected, lets progress...
-					recv_multistream = true;
-				}
+			while(in.remaining()>0) {
+				// We haven't performed the multistream handshake yet, so we should do that now.
 				
-				if (recv_multistream) {
-					// We have a proposed protocol...
-					recv_protocol = l;
+				// Try to read a complete packet. If we can't we abort so we can try later.
+				try {
+					String l = OutgoingMultistreamSelectSession.readMultistream(in);
+					
+					// Move forward...
+					in.compact();
+					in.flip();
+					
+					if (recv_multistream) {
+						// We have a proposed protocol...
+						recv_protocol = l;
+					}
+					
+					// For now, we only support multistream/1.0.0
+					if (l.equals(OutgoingMultistreamSelectSession.MULTISTREAM)) {
+						// OK, as expected, lets progress...
+						OutgoingMultistreamSelectSession.writeMultistream(out, OutgoingMultistreamSelectSession.MULTISTREAM);
+						recv_multistream = true;
+					}				
+				} catch(BufferUnderflowException bue) {
+					in.rewind();	// Partial packet. We'll try and read again later...
+					break;
 				}
-			} catch(BufferUnderflowException bue) {
-				in.rewind();	// Partial packet. We'll try and read again later...
 			}
 			in.compact();
 		}
