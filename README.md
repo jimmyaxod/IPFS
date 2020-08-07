@@ -106,4 +106,10 @@ Once this is completed, if you have done everything correctly, you will receive 
     
 These keys have to be created from the above...
     
-TODO: Shared secret and key stretching
+TODO: Document shared secret and key stretching
+
+TODO: Document Yamux multiplexing
+
+TODO: Document ipfs/id Identify messaging
+
+TODO: Document kad DHT messaging
