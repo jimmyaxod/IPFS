@@ -3,10 +3,10 @@ Playing with IPFS
 
 For now, this will be limited to TCP transport. I'm going to be looking at the DHT.
 
-* multistream_select (DONE)
-* Secio (DONE)
-* Yamux multiplexing (DONE)
-* Crawling the DHT by random walk (DONE)
+* multistream_select (Working)
+* Secio (Working) [RSA, ECDSA, Ed25519]
+* Yamux multiplexing (Working, needs formalizing)
+* Crawling the DHT by random walk (Working)
 * Listening for requests by operating in 'server' mode on the DHT (TODO)
 
 Aims
