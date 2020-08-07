@@ -24,8 +24,12 @@ public class OutgoingMultistreamSelectSession {
 	public final static String PROTO_SECIO = "/secio/1.0.0\n";
 	public final static String PROTO_YAMUX = "/yamux/1.0.0\n";
 
+	public final static String PROTO_ID = "/ipfs/id/1.0.0\n";
+	public final static String PROTO_DHT = "/ipfs/kad/1.0.0\n";
+
 	public String proto = null;
 	public boolean handshaked = false;
+	public boolean sent_handshake = false;
 
 	/**
 	 * Setup a new multistream
@@ -49,6 +53,12 @@ public class OutgoingMultistreamSelectSession {
 	 * @return	true when multistream handshake has completed
 	 */
 	public boolean process(ByteBuffer in, ByteBuffer out) {
+		if (!sent_handshake) {
+			writeMultistream(out, MULTISTREAM);						
+			writeMultistream(out, proto);		
+			sent_handshake = true;
+		}
+		
 		if (!handshaked) {
 			// We haven't performed the multistream handshake yet, so we should do that now.
 			in.flip();
@@ -59,12 +69,11 @@ public class OutgoingMultistreamSelectSession {
 				logger.fine("Multistream handshake (" + l.trim() + ")");
 
 				// For now, we only support multistream/1.0.0
+				
+				// TODO: FIXME
 				if (l.equals(MULTISTREAM)) {
 					// OK, as expected, lets reply and progress...
-					writeMultistream(out, MULTISTREAM);						
-					writeMultistream(out, proto);
 
-				// For now, we only support secio/1.0.0
 				} else if (l.equals(proto)) {
 					// OK, need to move on to next stage now...
 					handshaked = true;

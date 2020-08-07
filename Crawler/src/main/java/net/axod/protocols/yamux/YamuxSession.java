@@ -1,5 +1,7 @@
 package net.axod.protocols.yamux;
 
+import net.axod.io.*;
+
 import java.util.*;
 import java.util.logging.*;
 import java.nio.*;
@@ -11,8 +13,10 @@ import java.nio.*;
 
 public class YamuxSession {
     private static Logger logger = Logger.getLogger("net.axod.protocols");
-	private HashMap activeInbuffers = new HashMap();
+	private HashMap activeIOPlugins = new HashMap();
 
+	private HashSet notSentSYN = new HashSet();
+	
 	private static final byte YAMUX_TYPE_DATA = 0;
 	private static final byte YAMUX_TYPE_WINDOW_UPDATE = 1;
 	private static final byte YAMUX_TYPE_PING = 2;
@@ -23,38 +27,20 @@ public class YamuxSession {
 	private static final short YAMUX_FLAG_FIN = 4;
 	private static final short YAMUX_FLAG_RST = 8;
 
-	private static final int BUFFER_SIZE_IN = 100000;
-	
 	public YamuxSession() {
 	}
-	
-	public void setupIncomingStream(int id) {
-		// For an incoming stream, we should send an ACK on the first packet...
-		setupStream(id);
-	}
-	
-	public void setupOutgoingStream(int id) {
+
+	public void setupOutgoingStream(int id, IOPlugin iop) {
 		// For an outgoing stream, we should send a SYN on the first packet...
-		setupStream(id);
-	}
-
-	public void setupStream(int id) {
 		logger.fine("Yamux setting up new stream " + id);
-		if (activeInbuffers.containsKey(id)) {
-			// ERROR!
+		if (activeIOPlugins.containsKey(id)) {
+			System.err.println("Yamux already have stream setup for " + id);
+			return;
 		}
-		ByteBuffer in = ByteBuffer.allocate(BUFFER_SIZE_IN);
-		activeInbuffers.put(id, in);		
+		activeIOPlugins.put(id, iop);	// Store it here...
+		notSentSYN.add(id);
 	}
 
-	/**
-	 * Get an input buffer so we can read from it...
-	 *
-	 */
-	public ByteBuffer getInputBuffer(int m_stream) {
-		return (ByteBuffer)activeInbuffers.get(m_stream);	
-	}
-	
 	/**
 	 * Process data
 	 *
@@ -76,7 +62,8 @@ public class YamuxSession {
 				if (m_type==YAMUX_TYPE_WINDOW_UPDATE || m_type==YAMUX_TYPE_DATA) {
 					if ((m_flags & YAMUX_FLAG_SYN) == YAMUX_FLAG_SYN) {
 						// New stream...
-						setupIncomingStream(m_stream);
+						System.err.println("Yamux incoming stream " + m_stream);
+						// TODO...
 					}
 				}
 				
@@ -92,15 +79,15 @@ public class YamuxSession {
 					byte[] d = new byte[m_length];
 					in.get(d);
 
-					ByteBuffer bb = (ByteBuffer)activeInbuffers.get(m_stream);
-					if (bb==null) {
-						// ERROR!	
+					IOPlugin iop = (IOPlugin)activeIOPlugins.get(m_stream);
+					if (iop==null) {
+						// ERROR!
+						System.err.println("Yamux no stream with id " + m_stream);
 					} else {
-						// TODO: Handle overflowing data
-						bb.put(d);
-						logger.fine("Yamux got data " + bb.position() + " for stream " + m_stream);
-					}
-					
+						iop.in.put(d);
+						logger.fine("Yamux got data " + iop.in.position() + " for stream " + m_stream);
+						iop.work();
+					}					
 				} else if (m_type==YAMUX_TYPE_WINDOW_UPDATE) {
 					
 				} else if (m_type==YAMUX_TYPE_PING) {
@@ -119,7 +106,29 @@ public class YamuxSession {
 		}
 		in.compact();
 		
-		// TODO: See if we should write anything out
+		Iterator i = activeIOPlugins.keySet().iterator();
+		while(i.hasNext()) {
+			Integer stream_id = (Integer)i.next();
+			IOPlugin iop = (IOPlugin)activeIOPlugins.get(stream_id);
+			
+			if (iop.wantsToWork()) {
+				iop.work();
+				// Check the out buffer...
+				if (iop.out.position()>0) {
+					logger.fine("Yamux our plugin " + stream_id + " wants to write data " + iop.out.position());
+					iop.out.flip();
+					byte[] data = new byte[iop.out.remaining()];
+					iop.out.get(data);
+					iop.out.compact();
+					short flags = 0;
+					if (notSentSYN.contains(stream_id)) {
+						flags = YAMUX_FLAG_SYN;
+						notSentSYN.remove(stream_id);
+					}
+					writeYamux(out, data, stream_id, flags);
+				}
+			}
+		}
 	}
 
 	/**

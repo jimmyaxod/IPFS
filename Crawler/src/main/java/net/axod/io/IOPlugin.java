@@ -15,6 +15,7 @@ public abstract class IOPlugin {
     protected IOCore ioCore = null;
     public ByteBuffer in = null;
     public ByteBuffer out = null;
+    public boolean closed = false;
 
     /**
      * Create an IOPlugin with default sizes
@@ -56,6 +57,7 @@ public abstract class IOPlugin {
      *
      */
     public void close() {
+    	closed = true;
         if (ioCore!=null) ioCore.close(this);
     }
 }
