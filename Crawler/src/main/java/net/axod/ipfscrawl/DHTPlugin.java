@@ -8,8 +8,10 @@ import com.google.protobuf.*;
 import com.google.protobuf.util.*;
 
 import io.ipfs.multihash.*;
+import io.ipfs.multiaddr.*;
 
 import java.nio.*;
+import java.util.*;
 
 /**
  * This will do all DHT work...
@@ -30,7 +32,7 @@ public class DHTPlugin {
 	}
 	
 	// called when there is data coming in, or we signalled we want to do something
-	public ByteBuffer work() {
+	public ByteBuffer work(ByteBuffer in) {
 		long now = System.currentTimeMillis();
 		ByteBuffer out = ByteBuffer.allocate(8192);		// FOR NOW...
 
@@ -65,7 +67,68 @@ public class DHTPlugin {
 			DHTMetrics.incSentType(DHTProtos.Message.MessageType.FIND_NODE.toString());
 			lastQueryTime = now;
 		}
-		
+
+		if (in!=null) {
+			in.flip();
+			while(in.remaining()>0) {
+				try {
+					// Read a varint
+					int ll = (int)OutgoingMultistreamSelectSession.readVarInt(in);
+
+					// TODO: Some protection here...
+					byte[] idd = new byte[ll];
+					in.get(idd);
+					
+					// Progress...
+					in.compact();
+					in.flip();
+
+					try {
+						DHTProtos.Message msg = DHTProtos.Message.parseFrom(idd);
+	
+						DHTMetrics.incRecvType(msg.getType().toString());
+						
+						String msg_json = JsonFormat.printer().print(msg);
+						long now2 = System.currentTimeMillis();
+						Crawl.outputs.writeFile("packets", now2 + "," + msg_json + "\n");
+						
+			//												System.out.println("-> KAD PACKET " + msg);
+						
+						// Now we need to parse out closerPeers
+						
+						Iterator i = msg.getCloserPeersList().iterator();
+						while(i.hasNext()) {
+							DHTProtos.Message.Peer closer = (DHTProtos.Message.Peer)i.next();
+							Multihash id = new Multihash(closer.getId().toByteArray());
+							//System.out.println("PEER " + id);
+							
+							// Parse the addrs, and see if we can connect to anything...
+							Iterator j = closer.getAddrsList().iterator();
+							while(j.hasNext()) {
+								byte[] a = ((ByteString)j.next()).toByteArray();
+								try {
+									MultiAddress ma = new MultiAddress(a);
+									Crawl.outputs.writeFile("peers", now + "," + id + "," + ma + "\n");
+									
+									// For now, ask Crawl to connect to each one...
+									Crawl.addConnection(ma);
+									
+								} catch(Exception e) {
+									// Don't care!	
+								}
+							}
+						}
+					} catch(InvalidProtocolBufferException e) {
+						// Oh well...	
+					}
+				} catch(BufferUnderflowException bue) {
+					in.rewind();
+					break;
+					// Try again later...
+				}
+			}
+			in.compact();
+		}
 		return out;
 	}
 }

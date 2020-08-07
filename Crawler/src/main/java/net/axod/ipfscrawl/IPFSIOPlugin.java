@@ -115,8 +115,8 @@ public class IPFSIOPlugin extends IOPlugin {
 
 		if (on_dht) {
 			if (dht.wantsToWork()) {
-				ByteBuffer dht_out = dht.work();	
-				
+				ByteBuffer dht_out = dht.work(null);	// Nothing to go in...
+
 				if(dht_out!=null && dht_out.position()>0) {
 					try {
 						dht_out.flip();
@@ -319,6 +319,7 @@ public class IPFSIOPlugin extends IOPlugin {
 	 *
 	 */
 	public void handleStream4(ByteBuffer inbuffp) throws Exception {
+		int dht_stream = 9;
 		if (inbuffp==null) return;
 		inbuffp.flip();
 
@@ -334,65 +335,26 @@ public class IPFSIOPlugin extends IOPlugin {
 				}
 			}
 		}
-
-		while(inbuffp.remaining()>0) {
-			try {
-				// Read a varint
-				int ll = (int)OutgoingMultistreamSelectSession.readVarInt(inbuffp);
-
-				// TODO: Some protection here...
-				byte[] idd = new byte[ll];
-				inbuffp.get(idd);
-				
-				// Progress...
-				inbuffp.compact();
-				inbuffp.flip();
-				
-				DHTProtos.Message msg = DHTProtos.Message.parseFrom(idd);
-	
-				DHTMetrics.incRecvType(msg.getType().toString());
-				
-				String msg_json = JsonFormat.printer().print(msg);
-				long now2 = System.currentTimeMillis();
-				Crawl.outputs.writeFile("packets", now2 + "," + msg_json + "\n");
-				
-	//												System.out.println("-> KAD PACKET " + msg);
-				
-				// Now we need to parse out closerPeers
-				
-				Iterator i = msg.getCloserPeersList().iterator();
-				while(i.hasNext()) {
-					DHTProtos.Message.Peer closer = (DHTProtos.Message.Peer)i.next();
-					Multihash id = new Multihash(closer.getId().toByteArray());
-					//System.out.println("PEER " + id);
-					
-					// Parse the addrs, and see if we can connect to anything...
-					Iterator j = closer.getAddrsList().iterator();
-					while(j.hasNext()) {
-						byte[] a = ((ByteString)j.next()).toByteArray();
-						try {
-							MultiAddress ma = new MultiAddress(a);
-						//	System.out.println(" : " + ma);
-							long now = System.currentTimeMillis();
-							Crawl.outputs.writeFile("peers", now + "," + id + "," + ma + "\n");
-							
-							// For now...
-							Crawl.addConnection(ma);
-							
-							
-						} catch(Exception e) {
-							// Don't care!	
-						}
-						// TODO: Now connect to those ones etc etc
-					}
-				}
-			} catch(BufferUnderflowException bue) {
-				inbuffp.rewind();
-				break;
-				// Try again later...
-			}
-		}
 		inbuffp.compact();
+		
+		if (on_dht) {
+			ByteBuffer dht_out = dht.work(inbuffp);
+			
+			// Send anything...
+			if(dht_out!=null && dht_out.position()>0) {
+				try {
+					dht_out.flip();
+					byte[] multi_data2 = new byte[dht_out.remaining()];
+					dht_out.get(multi_data2);
+
+					ByteBuffer bbo = ByteBuffer.allocate(8192);
+					YamuxSession.writeYamux(bbo, multi_data2, dht_stream, (short)0);
+					secio.write(out, bbo);		// Write it out...
+				} catch(SecioException se) {
+					logger.warning("Could not write DHT packet");
+				}
+			}			
+		}
 	}
 
 	private void writeYamuxMultistreamEnc(String d, int m_stream, short m_flags) {
