@@ -28,6 +28,9 @@ import javax.crypto.spec.*;
  * 		LinkedList in_packets = secio.process(in, out, mykeys);
  *		secio.write(something)
  *
+ * TODO: Support more exchange, ciphers, hashers
+ * TODO: Support pubkeys other than RSA
+ *
  */
 public class SecioSession {
     private static Logger logger = Logger.getLogger("net.axod.crypto");
@@ -176,7 +179,7 @@ public class SecioSession {
 	 * Check the signature of a received Exchange packet
 	 *
 	 */
-	private boolean checkSignature() throws Exception {
+	private boolean checkSignature() throws SecioException {
 		Timing.enter("Secio.checkSignature");
 		try {
 			byte[] pubkey = remote_propose.getPubkey().toByteArray();
@@ -186,8 +189,7 @@ public class SecioSession {
 			PeerKeyProtos.KeyType keytype = pka.getType();
 			//System.out.println("keytype " + keytype);
 			
-			if (keytype!=PeerKeyProtos.KeyType.RSA) {
-				System.out.println("Can't support at this time");
+			if (keytype != PeerKeyProtos.KeyType.RSA) {
 				throw (new SecioException("Unsupported key " + keytype));
 			}
 
@@ -200,7 +202,11 @@ public class SecioSession {
 			verify.update(remote_propose.toByteArray());
 			verify.update(local_propose.toByteArray());
 			verify.update(remote_exchange.getEpubkey().toByteArray());
-			return verify.verify(remote_exchange.getSignature().toByteArray());		
+			return verify.verify(remote_exchange.getSignature().toByteArray());
+		} catch(SecioException se) {
+			throw(se);
+		} catch(Exception e) {
+			throw(new SecioException("Error checking signature " + e));
 		} finally {
 			Timing.leave("Secio.checkSignature");
 		}
@@ -512,11 +518,19 @@ public class SecioSession {
 		return inq;
 	}
 
+	/**
+	 * Accessor method for local public key
+	 *
+	 */
 	public byte[] getLocalPublicKey() throws SecioException {
 		if (local_propose==null) throw (new SecioException("hasn't been worked out yet!"));
 		return local_propose.getPubkey().toByteArray();
 	}
 	
+	/**
+	 * Accessor method for remote public key
+	 *
+	 */
 	public byte[] getRemotePublicKey() throws SecioException {
 		if (remote_propose==null) throw (new SecioException("hasn't been worked out yet!"));
 		return remote_propose.getPubkey().toByteArray();
