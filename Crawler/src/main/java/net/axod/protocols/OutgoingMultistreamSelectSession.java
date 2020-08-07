@@ -16,7 +16,7 @@ import java.util.logging.*;
  *
  */
 
-public class MultistreamSelectSession {
+public class OutgoingMultistreamSelectSession {
     private static Logger logger = Logger.getLogger("net.axod.protocols");
 	public final static String MULTISTREAM = "/multistream/1.0.0\n";
 
@@ -31,10 +31,10 @@ public class MultistreamSelectSession {
 	 * @param	proto	Which protocol do we want. Must include \n
 	 *					You can use any of the PROTO_* defs above.
 	 */
-	public MultistreamSelectSession(String proto) {
+	public OutgoingMultistreamSelectSession(String proto) {
 		this.proto = proto;
 	}
-	
+
 	/**
 	 * Process a multistream select
 	 * IN 'multistream'

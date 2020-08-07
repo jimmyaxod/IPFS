@@ -12,7 +12,7 @@ import com.google.protobuf.util.*;
 import io.ipfs.multihash.*;
 import io.ipfs.multiaddr.*;
 
-import java.net.*;
+import java.net.*;                             
 import java.nio.*;
 import java.util.*;
 import java.util.concurrent.atomic.*;
@@ -40,13 +40,13 @@ public class IPFSIOPlugin extends IOPlugin {
     String host = null;
 
     // Negotiate multistream secio
-	MultistreamSelectSession multi_secio = new MultistreamSelectSession(MultistreamSelectSession.PROTO_SECIO);
+	OutgoingMultistreamSelectSession multi_secio = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_SECIO);
 	
 	// This handles a SECIO session
 	SecioSession secio = new SecioSession();
 
 	// Negotiate multistream yamux
-	MultistreamSelectSession multi_yamux = new MultistreamSelectSession(MultistreamSelectSession.PROTO_YAMUX);
+	OutgoingMultistreamSelectSession multi_yamux = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_YAMUX);
 	
 	ByteBuffer yamuxInbuffer = ByteBuffer.allocate(200000);
 
@@ -187,7 +187,7 @@ public class IPFSIOPlugin extends IOPlugin {
 				// OK now lets send it...
 				byte[] multi_data = msg.toByteArray();
 				ByteBuffer vo = ByteBuffer.allocate(8192);
-				MultistreamSelectSession.writeVarInt(vo, multi_data.length);
+				OutgoingMultistreamSelectSession.writeVarInt(vo, multi_data.length);
 				vo.put(multi_data);
 				vo.flip();
 				byte[] multi_data2 = new byte[vo.remaining()];
@@ -218,7 +218,7 @@ public class IPFSIOPlugin extends IOPlugin {
 				// OK now lets send it...
 				byte[] multi_data = msg.toByteArray();
 				ByteBuffer vo = ByteBuffer.allocate(8192);
-				MultistreamSelectSession.writeVarInt(vo, multi_data.length);
+				OutgoingMultistreamSelectSession.writeVarInt(vo, multi_data.length);
 				vo.put(multi_data);
 				vo.flip();
 				byte[] multi_data2 = new byte[vo.remaining()];
@@ -320,7 +320,7 @@ public class IPFSIOPlugin extends IOPlugin {
 	public void handleIncomingId(int m_stream, ByteBuffer inbuffp) throws Exception {		
 		inbuffp.flip();
 		while(inbuffp.remaining()>0) {
-			String l = MultistreamSelectSession.readMultistream(inbuffp);								
+			String l = OutgoingMultistreamSelectSession.readMultistream(inbuffp);								
 
 			if (l.equals("/multistream/1.0.0\n")) {
 				writeYamuxMultistreamEnc("/multistream/1.0.0\n", m_stream, (short)2);
@@ -350,7 +350,7 @@ public class IPFSIOPlugin extends IOPlugin {
 							 
 				byte[] multi_data = id.toByteArray();
 				ByteBuffer vo = ByteBuffer.allocate(8192);
-				MultistreamSelectSession.writeVarInt(vo, multi_data.length);
+				OutgoingMultistreamSelectSession.writeVarInt(vo, multi_data.length);
 				vo.put(multi_data);
 				vo.flip();
 				byte[] multi_data2 = new byte[vo.remaining()];
@@ -375,7 +375,7 @@ public class IPFSIOPlugin extends IOPlugin {
 		if (!setup_stream_6) {
 			while(inbuffp.remaining()>0) {
 				// TODO: Break on failure...
-				String l = MultistreamSelectSession.readMultistream(inbuffp);											
+				String l = OutgoingMultistreamSelectSession.readMultistream(inbuffp);											
 				logger.fine("Yamux(ipfs/id) Multistream handshake (" + l.trim() + ")");
 				if (l.equals("/ipfs/id/1.0.0\n")) {
 					setup_stream_6 = true;
@@ -387,7 +387,7 @@ public class IPFSIOPlugin extends IOPlugin {
 		while(inbuffp.remaining()>0) {
 			// Read a varint
 			try {
-				int ll = (int)MultistreamSelectSession.readVarInt(inbuffp);
+				int ll = (int)OutgoingMultistreamSelectSession.readVarInt(inbuffp);
 	
 				byte[] idd = new byte[ll];
 				inbuffp.get(idd);
@@ -448,7 +448,7 @@ public class IPFSIOPlugin extends IOPlugin {
 		
 		if (!setup_stream_7) {
 			while(inbuffp.remaining()>0) {
-				String l = MultistreamSelectSession.readMultistream(inbuffp);											
+				String l = OutgoingMultistreamSelectSession.readMultistream(inbuffp);											
 				//logger.info("Yamux(" + m_stream + ") Multistream handshake (" + l.trim() + ")");
 				if (l.equals("/ipfs/kad/1.0.0\n")) {
 					setup_stream_7 = true;
@@ -461,7 +461,7 @@ public class IPFSIOPlugin extends IOPlugin {
 		while(inbuffp.remaining()>0) {
 			try {
 				// Read a varint
-				int ll = (int)MultistreamSelectSession.readVarInt(inbuffp);
+				int ll = (int)OutgoingMultistreamSelectSession.readVarInt(inbuffp);
 
 				// TODO: Some protection here...
 				byte[] idd = new byte[ll];
@@ -521,7 +521,7 @@ public class IPFSIOPlugin extends IOPlugin {
 	private void writeYamuxMultistreamEnc(String d, int m_stream, short m_flags) {
 		try {
 			ByteBuffer bbm = ByteBuffer.allocate(8192);
-			MultistreamSelectSession.writeMultistream(bbm, d);		
+			OutgoingMultistreamSelectSession.writeMultistream(bbm, d);		
 			bbm.flip();
 			byte[] multi_data = new byte[bbm.remaining()];
 			bbm.get(multi_data);
