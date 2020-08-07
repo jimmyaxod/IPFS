@@ -8,7 +8,7 @@ import java.util.logging.*;
  * It can read and write messages, and you can use the process to handle a
  * handshake.
  *
- * eg
+ * eg for an outgoing connection:
  * multi_secio = new Multistream(Multistream.PROTO_SECIO);
  * ...
  * if (multi_secio.process(in, out)) {
@@ -37,6 +37,10 @@ public class MultistreamSelectSession {
 	
 	/**
 	 * Process a multistream select
+	 * IN 'multistream'
+	 * OUT 'multistream'
+	 * OUT 'protocol'
+	 * IN 'protocol'
 	 *
 	 * @param	in	Input buffer
 	 * @param	out	An output buffer we can write to

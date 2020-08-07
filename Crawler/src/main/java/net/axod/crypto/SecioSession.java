@@ -20,31 +20,37 @@ import javax.crypto.spec.*;
 
 /**
  * A Secio session handles SECIO
+ * https://github.com/libp2p/go-libp2p-secio
  *
  *
+ * Example usage:
+ *		SecioSession secio = new SecioSession();
+ * 		LinkedList in_packets = secio.process(in, out, mykeys);
+ *		secio.write(something)
  *
  */
 public class SecioSession {
     private static Logger logger = Logger.getLogger("net.axod.crypto");
 
-	public boolean we_are_primary = true;
-	
-	public SecioProtos.Propose local_propose = null;
-	public SecioProtos.Propose remote_propose = null;
-	public SecioProtos.Exchange local_exchange = null;
-	public SecioProtos.Exchange remote_exchange = null;
-
-	public Mac incoming_HMAC;
-	public Mac outgoing_HMAC;
-	
-	public Cipher incoming_cipher;
-	public Cipher outgoing_cipher;
+	private boolean we_are_primary = true;
 
 	// The EC keys
-	public KeyPair ec_keys = null;
+	private KeyPair ec_keys = null;
 
 	// Final secio handshake verifying our nonces
-	public boolean got_enc_nonce = false;
+	private boolean got_enc_nonce = false;
+
+	private SecioProtos.Propose local_propose = null;
+	private SecioProtos.Propose remote_propose = null;
+	private SecioProtos.Exchange local_exchange = null;
+	private SecioProtos.Exchange remote_exchange = null;
+
+	private Mac incoming_HMAC;
+	private Mac outgoing_HMAC;
+	
+	private Cipher incoming_cipher;
+	private Cipher outgoing_cipher;
+
 	
 	/**
 	 *
@@ -374,7 +380,8 @@ public class SecioSession {
 	 * Write some data out using the cipher and mac
 	 *
 	 */
-	public void write(ByteBuffer out, ByteBuffer data) {
+	public void write(ByteBuffer out, ByteBuffer data) throws SecioException {
+		if (!got_enc_nonce) throw new SecioException("We haven't handshaked yet. Please wait");
 		data.flip();
 		byte[] d = new byte[data.remaining()];
 		data.get(d);
@@ -385,7 +392,8 @@ public class SecioSession {
 	 * Write some data out using the cipher and mac
 	 *
 	 */
-	public void write(ByteBuffer out, byte[] data) {
+	public void write(ByteBuffer out, byte[] data) throws SecioException {
+		if (!got_enc_nonce) throw new SecioException("We haven't handshaked yet. Please wait");		
 		if (data.length==0) return;
 		Timing.enter("secio.write");
 		byte[] enc_data = outgoing_cipher.update(data);
@@ -504,4 +512,13 @@ public class SecioSession {
 		return inq;
 	}
 
+	public byte[] getLocalPublicKey() throws SecioException {
+		if (local_propose==null) throw (new SecioException("hasn't been worked out yet!"));
+		return local_propose.getPubkey().toByteArray();
+	}
+	
+	public byte[] getRemotePublicKey() throws SecioException {
+		if (remote_propose==null) throw (new SecioException("hasn't been worked out yet!"));
+		return remote_propose.getPubkey().toByteArray();
+	}
 }

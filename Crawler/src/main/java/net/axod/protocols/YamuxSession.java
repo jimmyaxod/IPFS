@@ -110,12 +110,7 @@ public class YamuxSession {
 	}
 
 	public static void writeYamux(ByteBuffer dest, byte[] multi_data, int m_stream, short m_flags) {
-		dest.put((byte)0);		// ver
-		dest.put((byte)0);		// type
-		dest.putShort(m_flags);
-		dest.putInt(m_stream);	// Stream ID
-		dest.putInt(multi_data.length);
-		dest.put(multi_data);
+		writeYamux(dest, multi_data, 0, m_stream, m_flags);
 	}
 
 	public static void writeYamux(ByteBuffer dest, byte[] multi_data, int m_type, int m_stream, short m_flags) {
