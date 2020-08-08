@@ -24,9 +24,11 @@ public class Crawl implements IOCoreListener {
 	private static long PERIOD_STATUS = 5000;
 	
 	public static FileOutputUtils outputs = new FileOutputUtils();
-	
+
+	// Keep track of current connected hosts
 	public static HashSet currentConnectedHosts = new HashSet();
 	
+	// Max io size
 	private static int max_size = 100;
 	
 	/**
@@ -42,10 +44,13 @@ public class Crawl implements IOCoreListener {
 
 			io = new IOCore(new Crawl());		// IOCoreListener
 
-			// Try an outgoing connection...
-
 			for(int i=0;i<args.length;i++) {
-				if (args[i].equals("--max")) {
+				if (args[i].equals("--help")) {
+					System.out.println(" --dest <host> <port>");
+					System.out.println(" --listen <host> <port>");
+					System.out.println(" --max <num>");
+					System.exit(0);
+				} else if (args[i].equals("--max")) {
 					i++;
 					max_size = Integer.parseInt(args[i]);
 				} else if (args[i].equals("--dest")) {
@@ -98,7 +103,6 @@ public class Crawl implements IOCoreListener {
 						for(StackTraceElement st : stackTrace){
 						    System.err.println(st);
 						}
-//						io.dumpStack();
 					}
 					
 					lastStatus = System.currentTimeMillis();
@@ -144,23 +148,27 @@ public class Crawl implements IOCoreListener {
 
 		if (!ma.isTCPIP()) return;
 		String host = ma.getHost();
-
-//			if (host.indexOf(":")!=-1) return;	// Don't care about ipv6 for now
 		int port = ma.getTCPPort();
 
 		try {
-			
 			if (currentConnectedHosts.contains(host)) {
 				return;
 			}
 			
 			if (recentConnectedHosts.containsKey(host)) {
-				// Don't bother
 				return;
 			}
-			currentConnectedHosts.add(host);				// Put it in here...
 	
-			Node dest = new Node(new InetSocketAddress(host, port));
+			InetSocketAddress isa = new InetSocketAddress(host, port);
+			
+			if (isa.getAddress().isSiteLocalAddress()) {
+				// It's a local address. Ignore it...
+				return;
+			}
+
+			currentConnectedHosts.add(host);				// Put it in here...
+			
+			Node dest = new Node(isa);
 			dest.properties.put("host", host);
 			logger.fine("Attempting connection to " + dest + "...");
 	
@@ -169,7 +177,6 @@ public class Crawl implements IOCoreListener {
 			if (!suc) {
 				unregisterConnection(host);	
 			}
-			//System.out.println("connection ok? " + suc);
 		} catch(Exception e) {
 			System.err.println("Connect failed " + host + " port " + port);
 			e.printStackTrace();
@@ -178,8 +185,10 @@ public class Crawl implements IOCoreListener {
 	}
 
     public void connectionCallback(Node n, boolean success) {
+    	long now = System.currentTimeMillis();
+    	// Write to connectivity log...
+    	outputs.writeFile("connectivity", now + "," + n.getInetSocketAddress().getAddress().getHostAddress() + "," + n.getInetSocketAddress().getPort() + "," + success + "\n");
     	String host = (String)n.properties.get("host");
-//    	System.out.println("connectionCallback " + n + " host " + host + " " + success);
     	if (!success) {
     		unregisterConnection(host);
     	}
