@@ -33,7 +33,9 @@ import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
  *		secio.write(something)
  *
  * TODO: Support more exchange, ciphers, hashers
- * TODO: Support pubkeys other than RSA
+ * TODO: If we support multiple exchange,ciphers,hashers decide which to use based
+ *       on their list as well.
+ * TODO: Support pubkey types
  *
  */
 public class SecioSession {
