@@ -15,3 +15,56 @@
 |   131 | go-ipfs/0.4.21/            |
 |   115 | go-ipfs/0.6.0/d6e036a      |
 
+## Nodes
+
+| Item                            |   Count |
+| ------------------------------- | ------- |
+| Total datapoints                | 356,769 |
+| Unique peerIDs                  |   4,445 |
+| Unique listen addresses         |  19,176 |
+|   Quic                          |   1,184 |
+|   Ws                            |     149 |
+|   TCP IPv6                      |  10,383 |
+|   TCP IPv4                      |   7,596 |
+
+## Protocol support
+
+| Item                            |   Count |
+| ------------------------------- | ------- |
+| Unique peerIDs                  |   4,445 |
+| /chain/1.1.1                    |       1 |
+| /chain/1.1.7                    |       1 |
+| /chat/1.1.0                     |       1 |
+| /floodsub/1.0.0                 |   1,112 |
+| /ipfs/bitswap                   |   3,368 |
+| /ipfs/bitswap/1.0.0             |   3,368 |
+| /ipfs/bitswap/1.1.0             |   3,368 |
+| /ipfs/bitswap/1.2.0             |     779 |
+| /ipfs/dht                       |   1,361 |
+| /ipfs/diag/net/1.0.0            |       2 |
+| /ipfs/diagnostics               |       2 |
+| /ipfs/graphsync/1.0.0           |       6 |
+| /ipfs/id/1.0.0                  |   4,445 |
+| /ipfs/id/push/1.0.0             |   4,357 |
+| /ipfs/kad/1.0.0                 |   4,433 |
+| /ipfs/lan/kad/1.0.0             |     753 |
+| /ipfs/ping/1.0.0                |   4,445 |
+| /ipfs/relay/line/0.1.0          |       2 |
+| /libp2p/autonat/1.0.0           |   1,702 |
+| /libp2p/circuit/relay/0.1.0     |   4,418 |
+| /libp2p/fetch/0.0.1             |     112 |
+| /libp2p/punching/1.0.0          |       1 |
+| /meshsub/1.0.0                  |   1,032 |
+| /meshsub/1.1.0                  |     973 |
+| /p2p/id/delta/1.0.0             |   1,880 |
+| /sbptp/1.0.0                    |     862 |
+| /sbst/1.0.0                     |       5 |
+| /shsk/1.0.0                     |      17 |
+| /strelayp/1.0.0                 |       1 |
+| /tc/1.1.1                       |       1 |
+| /textile/cafe/1.0.0             |       4 |
+| /textile/threads/2.0.0          |       4 |
+| /thread/0.0.1                   |       4 |
+| /x/                             |   3,301 |
+
+Peers collected in an hour (Small machine, max 2000 concurrent connections):   18,761 unique peerID, 314,277 unique addresses.
