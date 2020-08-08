@@ -1,5 +1,12 @@
 # Protocol
 
+To play with IPFS, we need to jump through several hoops. This is not a simple protocol like BitTorrent, or HTTP. It has several layers.
+
+1. Security - For now, we are only going to support secio. This encrypts and signs all messages.
+2. Multiplex - For now, we are only supporting yamux. This allows us to open several different 'streams' within the same connection.
+3. Identify - Allows us to identify who we are communicating with, and send our info to them.
+4. DHT - Finally, we get to play on the DHT.
+
 ## multistream
     
 First off, we need to handshake with multistream-select
