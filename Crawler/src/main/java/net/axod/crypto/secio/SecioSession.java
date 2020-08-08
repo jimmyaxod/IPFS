@@ -39,7 +39,7 @@ import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
  *
  */
 public class SecioSession {
-    private static Logger logger = Logger.getLogger("net.axod.crypto");
+    private static Logger logger = Logger.getLogger("net.axod.crypto.secio");
 
 	private boolean we_are_primary = true;
 
@@ -63,18 +63,17 @@ public class SecioSession {
 	static {
 		Security.addProvider(new BouncyCastleProvider());
 	}
-	
-	
+
 	/**
 	 *
 	 * Create a new session
 	 */
 	public SecioSession() {
-		
-	}
 	
+	}
+
 	/**
-	 * This decides who is in charge.
+	 * This decides who is in charge of the connection.
 	 *
 	 */
 	private void decideOrder() {
@@ -95,19 +94,12 @@ public class SecioSession {
 			String hash1 = h1.toString();
 			String hash2 = h2.toString();
 			
-			for(int i=0;i<hash1.length();i++) {
-				char c1 = hash1.charAt(i);
-				char c2 = hash2.charAt(i);
-				if (c1==c2) {
-					// Carry on...
-				} else if (c1<c2) {
-					we_are_primary = false;
-					break;
-				} else if (c1>c2) {
-					we_are_primary = true;
-					break;
-				}
-			}	
+			if (hash1.equals(hash2)) {
+				// ABORT! We connected to ourself??!	
+			}
+			
+			we_are_primary = (hash1.compareTo(hash2) > 0);
+			
 		} catch(java.security.NoSuchAlgorithmException nae) {
 			System.err.println("java.security.NoSuchAlgorithmException");
 			System.exit(-1);	
@@ -132,6 +124,7 @@ public class SecioSession {
         byte[] pubk = ec_keys.getPublic().getEncoded();
 
         // Try extracting what we need to go into the packet...
+        // TODO: This may not be best way to do it...
 		byte[] ec_pubkey = new byte[65];
 		ec_pubkey[0] = 4;
 		System.arraycopy(pubk, pubk.length - 64, ec_pubkey, 1, 64);
@@ -145,7 +138,6 @@ public class SecioSession {
 		sign.update(local_propose.toByteArray());
 		sign.update(remote_propose.toByteArray());
 		sign.update(ec_pubkey);
-		
 		byte[] signature = sign.sign();
 		
 		local_exchange = SecioProtos.Exchange.newBuilder()
@@ -195,12 +187,9 @@ public class SecioSession {
 			byte[] pubkey = remote_propose.getPubkey().toByteArray();
 			PeerKeyProtos.PublicKey pka = PeerKeyProtos.PublicKey.parseFrom(pubkey);
 			
-			// TODO: Make sure it's an RSA key...
 			PeerKeyProtos.KeyType keytype = pka.getType();
-			//System.out.println("keytype " + keytype);
-
 			byte[] keybytes = pka.getData().toByteArray();
-			
+
 			PublicKey pk = null;
 			Signature verify = null;
 
@@ -215,10 +204,9 @@ public class SecioSession {
 				SubjectPublicKeyInfo pubKeyInfo = new SubjectPublicKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), keybytes);
 				X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(pubKeyInfo.getEncoded());
 				pk = KeyFactory.getInstance("Ed25519").generatePublic(x509KeySpec);
-
-//				pk = KeyFactory.getInstance("Ed25519").generatePublic(new X509EncodedKeySpec(keybytes));
-				verify = Signature.getInstance("Ed25519");				
+				verify = Signature.getInstance("Ed25519");
 			} else {
+				// TODO: Support any other keytypes...
 				System.out.println("NEWKEYTYPE " + keytype);
 				throw (new SecioException("Unsupported key " + keytype));
 			}
@@ -236,7 +224,7 @@ public class SecioSession {
 			Timing.leave("Secio.checkSignature");
 		}
 	}
-	
+
 	/**
 	 * Converts an uncompressed secp256r1 / P-256 public point to the EC public key it is representing.
 	 * @param w a 64 byte uncompressed EC point starting with <code>04</code>
@@ -433,7 +421,7 @@ public class SecioSession {
 		out.putInt(enc_data.length + mac_data.length);
 		out.put(enc_data);
 		out.put(mac_data);	
-		Timing.enter("secio.write");
+		Timing.leave("secio.write");
 	}
 
 	/**
@@ -461,10 +449,6 @@ public class SecioSession {
 				if (remote_propose == null) {							
 					remote_propose = SecioProtos.Propose.parseFrom(data);
 					logger.fine("Secio remote propose\n" + remote_propose + "\n");
-	
-					//byte[] pubkey = remote_propose.getPubkey().toByteArray();
-					//PeerKeyProtos.PublicKey pk = PeerKeyProtos.PublicKey.parseFrom(pubkey);
-					//logger.info("Secio remote peerID " + getPeerID(pubkey));
 
 					createLocalPropose(mykeys.getPublic().getEncoded(), "P-256", "AES-256", "SHA256");							
 					logger.fine("Secio local propose\n" + local_propose);							
