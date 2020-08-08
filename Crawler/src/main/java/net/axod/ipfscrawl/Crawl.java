@@ -53,13 +53,16 @@ public class Crawl implements IOCoreListener {
 					String host = args[i];
 					i++;
 					int port = Integer.parseInt(args[i]);
-					Node dest = new Node(new InetSocketAddress(host, port));
-					dest.properties.put("host", "127.0.0.1");
-					logger.info("Attempting connection to " + dest + "...");
-		
-					IOPluginFactory iof = new IPFSIOPluginFactory();
-					boolean suc = io.addConnection(dest, iof, null);
-					System.out.println("connection ok? " + suc);
+					try {
+						Node dest = new Node(new InetSocketAddress(host, port));
+						dest.properties.put("host", host);
+						logger.info("Attempting connection to " + dest + "...");
+	
+						IOPluginFactory iof = new IPFSIOPluginFactory();
+						boolean suc = io.addConnection(dest, iof, null);
+					} catch(Exception e) {
+						// Could not connect...	
+					}
 				} else if (args[i].equals("--listen")) {
 					// Setup a listener on the given host / port...
 					i++;

@@ -2,6 +2,7 @@ package net.axod.handlers;
 
 import net.axod.io.*;
 import net.axod.pb.*;
+import net.axod.util.*;
 import net.axod.protocols.multistream.*;
 import net.axod.crypto.secio.*;
 import net.axod.crypto.keys.*;
@@ -142,8 +143,8 @@ public class HandlerKADDHT extends IOPlugin {
 									
 									// For now, ask Crawl to connect to each one...
 									Crawl.addConnection(ma);
-									
 								} catch(Exception e) {
+									System.err.println("DHT Exception decoding MultiAddress " + ByteUtil.toHexString(a) + " " + e);
 									// Don't care!	
 								}
 							}

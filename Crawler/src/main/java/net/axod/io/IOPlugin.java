@@ -16,6 +16,9 @@ public abstract class IOPlugin {
     public ByteBuffer in = null;
     public ByteBuffer out = null;
     public boolean closed = false;
+    
+    public Node node;
+    public InetSocketAddress local;
 
     /**
      * Create an IOPlugin with default sizes

@@ -19,14 +19,13 @@ import com.google.protobuf.util.*;
 public class IdentifyPlugin {
 	public static LinkedList listens = new LinkedList();
 	
-	public static byte[] getIdentify(byte[] publickey, String local_peerID, String remote_peerID) {
-		MultiAddress observed1 = new MultiAddress("/ip4/86.171.62.88/tcp/3399");	// TODO: Fix
+	public static byte[] getIdentify(byte[] publickey, String local_peerID, String remote_peerID, MultiAddress observed) {
 
 		IPFSProtos.Identify.Builder builder = IPFSProtos.Identify.newBuilder()
 					 .setProtocolVersion("ipfs/0.1.0")
 					 .setAgentVersion("mindYourOwnBusiness/0.0.1")
 					 .setPublicKey(ByteString.copyFrom(publickey))
-					 .setObservedAddr(ByteString.copyFrom(observed1.getBytes()))
+					 .setObservedAddr(ByteString.copyFrom(observed.getBytes()))
 					 .addProtocols("/ipfs/id/1.0.0")
 					 .addProtocols("/ipfs/kad/1.0.0")
 					 .addProtocols("/x/")

@@ -6,7 +6,10 @@ import net.axod.ipfscrawl.*;
 import net.axod.crypto.keys.*;
 import net.axod.protocols.plugins.*;
 
+import io.ipfs.multiaddr.*;
+
 import java.nio.*;
+import java.net.*;
 
 public class HandlerIncoming extends IOPlugin {
 	IPFSIOPlugin iop = null;
@@ -52,11 +55,20 @@ public class HandlerIncoming extends IOPlugin {
 			}
 		} else {
 			if (multi.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_ID) && !id_sent) {
+				// Their observed address..
+				
+				InetSocketAddress isa = iop.node.getInetSocketAddress();
+				boolean isIPv6 = (isa.getAddress() instanceof Inet6Address);
+				
+				MultiAddress observed = new MultiAddress("/ip" + (isIPv6?"6":"4") + "/" + isa.getAddress().getHostAddress() + "/tcp/" + isa.getPort());
+
+				//System.out.println("Observed " + observed.toString());
+
 				try {
 					String local_peerID = KeyManager.getPeerID(iop.secio.getLocalPublicKey()).toString();
 					String remote_peerID = KeyManager.getPeerID(iop.secio.getRemotePublicKey()).toString();
 	
-					byte[] multi_data2 = IdentifyPlugin.getIdentify(iop.secio.getLocalPublicKey(), local_peerID, remote_peerID);
+					byte[] multi_data2 = IdentifyPlugin.getIdentify(iop.secio.getLocalPublicKey(), local_peerID, remote_peerID, observed);
 					out.put(multi_data2);
 				} catch(Exception e) {
 					System.err.println("Exception constructing identify packet");	
@@ -64,7 +76,7 @@ public class HandlerIncoming extends IOPlugin {
 				id_sent = true;
 			}
 			// Now we can work with the data...
-			
+
 			if (in.position()>0) {
 				System.out.println("INDATA (" + multi.getProtocol().trim() + ") data " + in.position());
 			}

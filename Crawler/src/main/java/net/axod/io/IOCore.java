@@ -302,10 +302,11 @@ public class IOCore extends Thread {
         try {
             ssc.finishConnect();
             IOConnectInfo nci = (IOConnectInfo) selk.attachment();
-
+                       
             selk.interestOps(SelectionKey.OP_READ);
             IOPlugin iop = nci.getIOPlugin();
             iop.ioCore = this;
+            iop.node = nci.node;
             connections.put(iop, nci);
             if (callback!=null) callback.connectionCallback(nci.node, true);            // Signal success!
             try {
@@ -402,6 +403,8 @@ public class IOCore extends Thread {
                         IOConnectInfo ni = new IOConnectInfo(iof, so, sk, node);
                         f = ni.getIOPlugin();
                         f.ioCore = this;
+                        f.node = node;
+                        f.local = lisa;
                         sk.attach(ni);
                         connections.put(f, ni);
                         try {

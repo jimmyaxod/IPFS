@@ -2,10 +2,16 @@ package net.axod.handlers;
 
 import net.axod.io.*;
 import net.axod.pb.*;
+import net.axod.util.*;
 import net.axod.protocols.multistream.*;
 import net.axod.crypto.secio.*;
 import net.axod.crypto.keys.*;
 import net.axod.ipfscrawl.*;
+
+import com.google.protobuf.*;
+import com.google.protobuf.util.*;
+
+import io.ipfs.multiaddr.*;
 
 import java.nio.*;
 import java.util.*;
@@ -50,6 +56,9 @@ public class HandlerIPFSID extends IOPlugin {
 		
 						//System.out.println("IDENT " + ident);
 		
+						MultiAddress observed = new MultiAddress(ident.getObservedAddr().toByteArray());
+						//System.out.println("OBSERVED " + observed);
+						
 						// That's their ID
 						String agentVersion = ident.getAgentVersion();
 						String protocolVersion = ident.getProtocolVersion();
@@ -63,10 +72,23 @@ public class HandlerIPFSID extends IOPlugin {
 	
 						byte[] pubkey = iop.secio.getRemotePublicKey();
 						String peerID = KeyManager.getPeerID(pubkey).toString();
-						
+
 						long now = System.currentTimeMillis();
 						Crawl.outputs.writeFile("ids", now + "," + iop.host + "," + peerID + "," + agentVersion + "," + protocolVersion + "," + protocols + "\n");
-					
+
+						// Log the listenAddrs...
+
+						Iterator j = ident.getListenAddrsList().iterator();
+						while(j.hasNext()) {
+							byte[] addrbytes = ((ByteString)j.next()).toByteArray();
+							try {
+								MultiAddress ma = new MultiAddress(addrbytes);
+								Crawl.outputs.writeFile("id_listens", now + "," + peerID + "," + ma.toString() + "\n");
+							} catch(Exception ee) {
+								System.err.println("HANDLERIPFSID: Exception decoding MultiAddress " + ByteUtil.toHexString(addrbytes));	
+							}
+						}
+						
 						close();
 						
 						iop.openDHTStream();
