@@ -48,9 +48,9 @@ IPFS DHT Query - 17 packets (9 out, 8 in)
 |   1 |     | DHT FIND_NODE query                |
 |     |   1 | DHT FIND_NODE response             |
 
-Protocol information can be found here: [Protocol.md]
+[Protocol information can be found here](Protocol.md)
 
-Crawl statistics: [crawl_stats.md]
+[Crawl statistics](crawl_stats.md)
 
 
 Incoming Yamux protocol negotiations (TODO)
