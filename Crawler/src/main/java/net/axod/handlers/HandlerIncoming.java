@@ -10,11 +10,11 @@ import java.nio.*;
 
 public class HandlerIncoming extends IOPlugin {
 	IPFSIOPlugin iop = null;
-	
+
 	IncomingMultistreamSelectSession multi = new IncomingMultistreamSelectSession();
-	
+
 	boolean id_sent = false;
-	
+
 	public HandlerIncoming(IPFSIOPlugin i) {
 		iop = i;	
 	}
@@ -30,21 +30,18 @@ public class HandlerIncoming extends IOPlugin {
 
 	public void work() {
 		long now = System.currentTimeMillis();
-		
+
 		if (!multi.hasHandshaked()) {
 			String proto = multi.process(in, out);
-			if (proto!=null) {
-				System.out.println("INCOMING [" + proto.trim() + "]");
-				
+			if (proto!=null) {				
 				// For now, log it...
 				Crawl.outputs.writeFile("in_protocols", now + "," + proto.trim() + "\n");
 
-				if (proto.equals(OutgoingMultistreamSelectSession.PROTO_DHT)) {
+				if (proto.equals(OutgoingMultistreamSelectSession.PROTO_ID)) {
+					multi.sendAccept(out);
+				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_DHT)) {
 					multi.sendAccept(out);
 					System.out.println("Sent accept for protocol DHT");
-				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_ID)) {
-					multi.sendAccept(out);
-					System.out.println("Sent accept for protocol ID");
 				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_BITSWAP)) {
 					multi.sendAccept(out);
 					System.out.println("Sent accept for protocol BITSWAP");
@@ -72,11 +69,6 @@ public class HandlerIncoming extends IOPlugin {
 				System.out.println("INDATA (" + multi.getProtocol().trim() + ") data " + in.position());
 			}
 		}
-		/*
-		if(out.position()>0) {
-			System.out.println("Sending data " + out.position());	
-		}
-		*/
 	}
 
 	public void closing() {

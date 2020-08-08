@@ -3,6 +3,7 @@ package net.axod.ipfscrawl;
 import net.axod.io.*;
 import net.axod.util.*;
 import net.axod.measurement.*;
+import net.axod.protocols.plugins.*;
 
 import java.net.*;
 import java.util.*;
@@ -60,12 +61,17 @@ public class Crawl implements IOCoreListener {
 					boolean suc = io.addConnection(dest, iof, null);
 					System.out.println("connection ok? " + suc);
 				} else if (args[i].equals("--listen")) {
-					// Setup a listener on the given port...
+					// Setup a listener on the given host / port...
+					i++;
+					String host = args[i];
 					i++;
 					int port = Integer.parseInt(args[i]);
-					InetSocketAddress isa = new InetSocketAddress(port);
+					InetSocketAddress isa = new InetSocketAddress(host, port);
 					IOPluginFactory iof = new IPFSIOPluginFactoryIn();
 					io.addListen(isa, iof);
+					
+					// We will also add this to our identify packet
+					IdentifyPlugin.registerListen(host, port);
 				}
 			}
 
