@@ -15,30 +15,53 @@ Aims
  * Insight into what content is being shared, individual volumes by hash.
  * Monitor nefarious use of the network - bot control channel eg 'Storm'
 
+Comparison with BitTorrent DHT
+
+BitTorrent DHT Query - 2 packets (1 out, 1 in)
+
+| out |  in | Description        |
+| --- | --- | ------------------ |
+|   1 |     | FIND_NODE query    |
+|     |   1 | FIND_NODE response |
+
+IPFS DHT Query - 17 packets (9 out, 8 in)
+
+| out |  in | Description                        |
+| --- | --- | ---------------------------------- |
+|   1 |     | TCP SYN                            |
+|     |   1 | TCP SYN/ACK                        |
+|   1 |     | TCP ACK                            |
+|   1 |     | Multistream_select (secio)         |
+|     |   1 | Multistream_accept (secio)         |
+|   1 |     | Secio PROPOSE                      |
+|     |   1 | Secio PROPOSE                      |
+|   1 |     | Secio EXCHANGE                     |
+|     |   1 | Secio EXCHANGE                     |
+|   1 |     | Secio encoded nonce                |
+|     |   1 | Secio encoded nonce                |
+|   1 |     | Multistream_select (yamux)         |
+|     |   1 | Multistream_accept (yamux)         |
+|   1 |     | Yamux Multistream_select (kad dht) |
+|     |   1 | Yamux Multistream_accept (kad dht) |
+|   1 |     | DHT FIND_NODE query                |
+|     |   1 | DHT FIND_NODE response             |
+
+
 Top versions from a crawl
 
 | Count | Version ID                 |
 | ----- | -------------------------- |
-|  1263 | go-ipfs/0.4.20/            |
-|   903 | go-ipfs/0.4.22/            |
-|   868 | storm                      |
-|   274 | go-ipfs/0.6.0/             |
-|   171 | go-ipfs/0.4.23/            |
-|   139 | go-ipfs/0.5.1/             |
-|   129 | hydra-booster/0.4.3        |
-|   123 | go-ipfs/0.4.21/            |
-|   103 | go-ipfs/0.6.0/d6e036a      |
-|    80 | dhtbooster/2               |
-|    56 | go-ipfs/0.5.0/             |
-|    37 | go-ipfs/0.6.0/d6e036a88    |
-|    30 | go-ipfs/0.4.23/5b1687d     |
-|    26 | go-ipfs/0.4.17/            |
-|    25 | go-ipfs/0.4.18/            |
-|    17 | go-ipfs/0.5.1/8431e2e87    |
-|    16 | go-ipfs/0.6.0-rc7/2041cea  |
-|    14 | go-ipfs/0.4.19/            |
-|    12 | go-ipfs/0.6.0-rc6/f177fdd  |
-|    12 | go-ipfs/0.4.23/6ce9a35     |
+|  2193 | storm                      |
+|  1324 | go-ipfs/0.4.22/            |
+|  1306 | go-ipfs/0.4.20/            |
+|   475 | hydra-booster/0.4.3        |
+|   315 | go-ipfs/0.6.0/             |
+|   217 | go-ipfs/0.4.23/            |
+|   169 | dhtbooster/2               |
+|   156 | go-ipfs/0.5.1/             |
+|   131 | go-ipfs/0.4.21/            |
+|   115 | go-ipfs/0.6.0/d6e036a      |
+
 
 Incoming Yamux protocol negotiations (TODO)
 
