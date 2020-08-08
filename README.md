@@ -8,6 +8,8 @@ For now, this will be limited to TCP transport. I'm going to be looking at the D
 * Yamux multiplexing (Working, needs formalizing)
 * Crawling the DHT by random walk (Working)
 * Listening for requests by operating in 'server' mode on the DHT (TODO)
+* Incoming TCP connections (Started)
+* BITSWAP, circuit relay etc
 
 Aims
  * Insight into who is using IPFS, geography, orgs, etc
