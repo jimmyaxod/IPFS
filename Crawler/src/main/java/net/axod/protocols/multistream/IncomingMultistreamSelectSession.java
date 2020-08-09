@@ -63,7 +63,7 @@ public class IncomingMultistreamSelectSession {
 					// For now, we only support multistream/1.0.0
 					if (l.equals(OutgoingMultistreamSelectSession.MULTISTREAM)) {
 						// OK, as expected, lets progress...
-						OutgoingMultistreamSelectSession.writeMultistream(out, OutgoingMultistreamSelectSession.MULTISTREAM);
+						//OutgoingMultistreamSelectSession.writeMultistream(out, OutgoingMultistreamSelectSession.MULTISTREAM);
 						recv_multistream = true;
 					}				
 				} catch(BufferUnderflowException bue) {
@@ -81,11 +81,13 @@ public class IncomingMultistreamSelectSession {
 	}
 	
     public void sendAccept(ByteBuffer out) {
+		OutgoingMultistreamSelectSession.writeMultistream(out, OutgoingMultistreamSelectSession.MULTISTREAM);
 		OutgoingMultistreamSelectSession.writeMultistream(out, recv_protocol);
 		handshaked = true;
     }
     
     public void sendReject(ByteBuffer out) {
+		OutgoingMultistreamSelectSession.writeMultistream(out, OutgoingMultistreamSelectSession.MULTISTREAM);
 		OutgoingMultistreamSelectSession.writeMultistream(out, OutgoingMultistreamSelectSession.PROTO_NA);
 		handshaked = true;
     }

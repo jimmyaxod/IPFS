@@ -106,6 +106,7 @@ public class YamuxSession {
 						iop.in.put(d);
 						logger.fine("Yamux got data " + iop.in.position() + " for stream " + m_stream);
 						iop.work();
+						writeFromIOP(out, m_stream, iop);
 					}					
 				} else if (m_type==YAMUX_TYPE_WINDOW_UPDATE) {
 					
@@ -124,7 +125,7 @@ public class YamuxSession {
 			in.flip();
 		}
 		in.compact();
-		
+
 		Iterator i = activeIOPlugins.keySet().iterator();
 		while(i.hasNext()) {
 			Integer stream_id = (Integer)i.next();
@@ -132,38 +133,33 @@ public class YamuxSession {
 
 			if (iop.wantsToWork()) {
 				iop.work();
-			}
-
-			// Check the out buffer...
-			if (iop.out.position()>0) {
-				if ((stream_id & 1)==0) {
-					// It was an incoming stream...
-					logger.info("Yamux our plugin " + stream_id + " wants to write data " + iop.out.position());
-					
-				} else {
-					// It was an outgoing stream...	
-				}
-//				logger.info("Yamux our plugin " + stream_id + " wants to write data " + iop.out.position());
-				iop.out.flip();
-				byte[] data = new byte[iop.out.remaining()];
-				iop.out.get(data);
-				iop.out.compact();
-				short flags = 0;
-				if (notSentSYN.contains(stream_id)) {
-					flags = YAMUX_FLAG_SYN;
-					notSentSYN.remove(stream_id);
-				}
-
-				if (notSentACK.contains(stream_id)) {
-					flags = YAMUX_FLAG_ACK;
-					notSentACK.remove(stream_id);
-				}
-				
-				writeYamux(out, data, stream_id, flags);
+				writeFromIOP(out, stream_id, iop);
 			}
 		}
 	}
 
+	private void writeFromIOP(ByteBuffer out, int stream_id, IOPlugin iop) {			
+		if (iop.out.position() > 0) {
+			logger.fine("Yamux our plugin " + stream_id + " wants to write data " + iop.out.position());
+			iop.out.flip();
+			byte[] data = new byte[iop.out.remaining()];
+			iop.out.get(data);
+			iop.out.compact();
+			short flags = 0;
+			if (notSentSYN.contains(stream_id)) {
+				flags = YAMUX_FLAG_SYN;
+				notSentSYN.remove(stream_id);
+			}
+
+			if (notSentACK.contains(stream_id)) {
+				flags = YAMUX_FLAG_ACK;
+				notSentACK.remove(stream_id);
+			}
+
+			writeYamux(out, data, stream_id, flags);
+		}
+	}
+	
 	/**
 	 * Write
 	 *

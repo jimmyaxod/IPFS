@@ -42,7 +42,7 @@ public class HandlerIncoming extends IOPlugin {
 
 		if (!multi.hasHandshaked()) {
 			String proto = multi.process(in, out);
-			if (proto!=null) {				
+			if (proto!=null) {
 				// For now, log it...
 				Crawl.outputs.writeFile("in_protocols", now + "," + proto.trim() + "\n");
 
@@ -86,7 +86,7 @@ public class HandlerIncoming extends IOPlugin {
 			// Now we can work with the data...
 
 			if (multi.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_DHT)) {
-				System.out.println("Working on yamuxin DHT session... " + in.position());
+				//System.out.println("IN DHT Working on yamuxin DHT session... " + in.position());
 				
 				// First copy the in buffer...
 				if (in.position()>0) {
@@ -94,7 +94,7 @@ public class HandlerIncoming extends IOPlugin {
 					dht.in.put(in);
 					in.compact();
 				}
-				
+
 				dht.work();
 				
 				if (dht.out.position()>0) {
@@ -103,22 +103,17 @@ public class HandlerIncoming extends IOPlugin {
 					dht.out.compact();
 				}
 				
-				System.out.println("Yamuxin output " + out.position());
-			}
-
-			if (in.position()>0) {
-				System.out.println("INDATA (" + multi.getProtocol().trim() + ") data " + in.position());
+				//System.out.println("IN DHT Yamuxin output " + out.position());
 			}
 		}
-		
+
 		byte[] o = new byte[out.position()];
 		out.flip();
 		out.get(o);
 		out.rewind();
 		out.compact();
-		
-		System.out.println("WRITING " + ByteUtil.toHexString(o));
-		
+
+		//System.out.println("WRITING " + iop.host + " " + multi.getProtocol() + " " + multi.hasHandshaked() + " " + ByteUtil.toHexString(o));
 	}
 
 	public void closing() {
