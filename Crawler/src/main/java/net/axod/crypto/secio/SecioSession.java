@@ -41,6 +41,9 @@ import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 public class SecioSession {
     private static Logger logger = Logger.getLogger("net.axod.crypto.secio");
 
+    // Are we outgoing, or incoming?
+    private boolean is_outgoing = true;
+    
 	private boolean we_are_primary = true;
 
 	// The EC keys
@@ -48,6 +51,7 @@ public class SecioSession {
 
 	// Final secio handshake verifying our nonces
 	private boolean got_enc_nonce = false;
+	private boolean sent_enc_nonce = false;
 
 	private SecioProtos.Propose local_propose = null;
 	private SecioProtos.Propose remote_propose = null;
@@ -400,7 +404,7 @@ public class SecioSession {
 	 *
 	 */
 	public void write(ByteBuffer out, ByteBuffer data) throws SecioException {
-		if (!got_enc_nonce) throw new SecioException("We haven't handshaked yet. Please wait");
+		if (!sent_enc_nonce) throw new SecioException("We haven't handshaked yet. Please wait");
 		data.flip();
 		byte[] d = new byte[data.remaining()];
 		data.get(d);
@@ -412,7 +416,7 @@ public class SecioSession {
 	 *
 	 */
 	public void write(ByteBuffer out, byte[] data) throws SecioException {
-		if (!got_enc_nonce) throw new SecioException("We haven't handshaked yet. Please wait");		
+		if (!sent_enc_nonce) throw new SecioException("We haven't handshaked yet. Please wait");		
 		if (data.length==0) return;
 		Timing.enter("secio.write");
 		byte[] enc_data = outgoing_cipher.update(data);
@@ -426,6 +430,12 @@ public class SecioSession {
 
 	/**
 	 * Process some incomming data on this session...
+	 * In PROPOSE
+	 * Out PROPOSE
+	 * In EXCHANGE
+	 * Out EXCHANGE
+	 * In nonce
+	 * Out nonce
 	 *
 	 * @param	in	Input buffer
 	 * @param	out	Output buffer, for handshaking etc
@@ -505,8 +515,9 @@ public class SecioSession {
 						got_enc_nonce = true;
 						
 						// Now we will send our own...
+						sent_enc_nonce = true;
 						write(out, remote_propose.getRand().toByteArray());
-						logger.fine("Sent our encrypted signed nonce");								
+						logger.fine("Sent our encrypted signed nonce");
 					} else {
 						// Add the message to our return list...
 						inq.add(plainText);
@@ -528,6 +539,117 @@ public class SecioSession {
 	}
 
 	/**
+	 * Process some incomming data on this session...
+	 * Out PROPOSE
+	 * In PROPOSE
+	 * Out EXCHANGE
+	 * In EXCHANGE
+	 * Out nonce
+	 * In nonce
+	 *
+	 * @param	in	Input buffer
+	 * @param	out	Output buffer, for handshaking etc
+	 *
+	 * @returns	LinkedList of incoming packets
+	 */
+	public LinkedList processServer(ByteBuffer in, ByteBuffer out, KeyPair mykeys) throws SecioException {
+		if (local_propose==null) {
+			createLocalPropose(mykeys.getPublic().getEncoded(), "P-256", "AES-256", "SHA256");							
+			logger.fine("Secio local propose\n" + local_propose);							
+
+			byte[] odata = local_propose.toByteArray();
+			out.putInt(odata.length);
+			out.put(odata);			
+		}
+		
+		LinkedList inq = new LinkedList();
+		while(in.position()>0) {
+			in.flip();
+			try {
+				int len = in.getInt();		// Length is 32bit int
+				if (len>8000000) {
+					logger.warning("Got a packet of >8MB?");
+					throw new SecioException("Packet of >8MB");
+				}
+
+				byte[] data = new byte[len];
+				in.get(data);
+
+				if (remote_propose == null) {							
+					remote_propose = SecioProtos.Propose.parseFrom(data);
+					logger.fine("Secio remote propose\n" + remote_propose + "\n");
+							//
+							// Now we have done the Propose, lets decide the order, and then we can decide on exchange, ciphers, hashes etc
+					decideOrder();
+
+					createLocalExchange(mykeys.getPrivate());							
+					logger.fine("Secio local exchange\n" + local_exchange);
+
+					byte[] odata = local_exchange.toByteArray();
+					out.putInt(odata.length);
+					out.put(odata);					
+				} else if (remote_exchange == null) {
+
+							// Now we're expecting an Exchange...
+					remote_exchange = SecioProtos.Exchange.parseFrom(data);
+					logger.fine("Secio remote exchange\n" + remote_exchange + "\n");
+
+					if (!checkSignature()) {
+						logger.warning("Secio signature did not validate!");
+						throw new SecioException("Secio signature did not validate");
+					}
+
+					initCiphersMacs();
+
+					sent_enc_nonce = true;
+					write(out, remote_propose.getRand().toByteArray());
+					logger.fine("Sent our encrypted signed nonce");
+				} else {
+					// General incoming data then...
+					
+					// First split off the mac, verify that's correct
+					int maclen = incoming_HMAC.getMacLength();
+        			byte[] mac = new byte[maclen];
+        			System.arraycopy(data, data.length - mac.length, mac, 0, mac.length);        					
+        			byte[] datanomac = new byte[data.length - mac.length];
+        			System.arraycopy(data, 0, datanomac, 0, datanomac.length);
+					byte[] sign = incoming_HMAC.doFinal(datanomac);
+					boolean verifies = ByteUtil.toHexString(sign).equals(ByteUtil.toHexString(mac));
+					if (!verifies) {
+						logger.warning("Incorrect MAC!");
+						throw new SecioException("Secio incorrect MAC");
+					}							
+        			byte[] plainText = incoming_cipher.update(datanomac);
+
+					if (!got_enc_nonce) {
+						// check it matches...
+						if (!ByteUtil.toHexString(plainText).equals(ByteUtil.toHexString(local_propose.getRand().toByteArray()))) {
+							logger.warning("The decrypted nonce does NOT match");
+							throw new SecioException("Secio nonce does NOT match");
+						}
+
+						got_enc_nonce = true;
+					} else {
+						// Add the message to our return list...
+						inq.add(plainText);
+					}
+				}             
+			} catch(BufferUnderflowException bue) {
+				// Not enough data...
+				in.rewind();		// Undo this packet read
+				in.compact();
+				break;
+			} catch(SecioException se) {
+				throw(se);
+			} catch(Exception e) {
+				throw(new SecioException(e.toString()));
+			}
+			in.compact();
+		}
+		return inq;
+	}
+	
+	/**
 	 * Accessor method for local public key
 	 *
 	 */
@@ -543,5 +665,9 @@ public class SecioSession {
 	public byte[] getRemotePublicKey() throws SecioException {
 		if (remote_propose==null) throw (new SecioException("hasn't been worked out yet!"));
 		return remote_propose.getPubkey().toByteArray();
+	}
+	
+	public boolean handshaked() {
+		return (sent_enc_nonce && got_enc_nonce);	
 	}
 }

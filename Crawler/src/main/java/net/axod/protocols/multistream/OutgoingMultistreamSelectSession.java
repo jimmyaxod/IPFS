@@ -43,9 +43,9 @@ public class OutgoingMultistreamSelectSession {
 
 	/**
 	 * Process a multistream select
-	 * IN 'multistream'
 	 * OUT 'multistream'
 	 * OUT 'protocol'
+	 * IN 'multistream'
 	 * IN 'protocol'
 	 *
 	 * @param	in	Input buffer
@@ -55,6 +55,7 @@ public class OutgoingMultistreamSelectSession {
 	 */
 	public boolean process(ByteBuffer in, ByteBuffer out) {
 		if (!sent_handshake) {
+			System.out.println("MULTISTREAM SELECT " + proto);
 			writeMultistream(out, MULTISTREAM);						
 			writeMultistream(out, proto);		
 			sent_handshake = true;

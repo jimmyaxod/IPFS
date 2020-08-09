@@ -19,7 +19,7 @@ import com.google.protobuf.util.*;
 import io.ipfs.multihash.*;
 import io.ipfs.multiaddr.*;
 
-import java.net.*;                             
+import java.net.*;
 import java.nio.*;
 import java.util.*;
 import java.security.*;
@@ -86,6 +86,14 @@ public class IPFSIOPlugin extends IOPlugin {
 	 * Does the plugin need to send anything
 	 */
 	public boolean wantsToWork() {
+		// If we're at this stage, we need to send a multistream select...
+		if (!multi_secio.sent_handshake) {
+		 	return true;
+		}
+
+		if (secio.handshaked() && !multi_yamux.sent_handshake) {
+			return true;	
+		}
 		long now = System.currentTimeMillis();
 		if (now - ctime > MAX_TIME) return true;
 		return false;	
@@ -102,30 +110,32 @@ public class IPFSIOPlugin extends IOPlugin {
 			return;
 		}
 		
-		logger.fine("Work " + in);
-
-		if (in.position()>0) {
-			// ======== multistream select scio ================================
-			if (multi_secio.process(in, out)) {
-				try {
-					LinkedList spackets = secio.process(in, out, mykeys);
+		// ======== multistream select scio ================================
+		if (multi_secio.process(in, out)) {
+			try {
+				LinkedList spackets = secio.process(in, out, mykeys);
+				
+				if (secio.handshaked()) {
 					for(int i=0;i<spackets.size();i++) {
 						byte[] pack = (byte[])spackets.get(i);
 						processSecioPacket(pack);
 					}
-				} catch(SecioException se) {
-					logger.info("Exception within secio " + se);
-					close();
-					return;
-				} catch(BufferUnderflowException bue) {
-					logger.info("Exception processing packet underflow " + bue);
-					bue.printStackTrace();					
-				} catch(Exception e) {
-					logger.info("Exception processing packet " + e);
-					e.printStackTrace();
-					close();
-					return;					
+	
+					// If we need to do something inside...
+					processSecioPacket(null);
 				}
+			} catch(SecioException se) {
+				logger.info("Exception within secio " + se);
+				close();
+				return;
+			} catch(BufferUnderflowException bue) {
+				logger.info("Exception processing packet underflow " + bue);
+				bue.printStackTrace();					
+			} catch(Exception e) {
+				logger.info("Exception processing packet " + e);
+				e.printStackTrace();
+				close();
+				return;					
 			}
 		}
 	}
@@ -135,8 +145,8 @@ public class IPFSIOPlugin extends IOPlugin {
 	 *
 	 */
 	public void processSecioPacket(byte[] plainText) throws Exception {
-		yamuxInbuffer.put(plainText);	// Add it on...
-		
+		if (plainText!=null) yamuxInbuffer.put(plainText);	// Add it on...
+
 		ByteBuffer outbuff = ByteBuffer.allocate(8192);		// For now...
 		
 		// multistream select yamux
