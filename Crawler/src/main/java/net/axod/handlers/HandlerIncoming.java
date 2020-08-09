@@ -5,6 +5,7 @@ import net.axod.protocols.multistream.*;
 import net.axod.ipfscrawl.*;
 import net.axod.crypto.keys.*;
 import net.axod.protocols.plugins.*;
+import net.axod.util.*;
 
 import io.ipfs.multiaddr.*;
 
@@ -17,6 +18,8 @@ public class HandlerIncoming extends IOPlugin {
 	IncomingMultistreamSelectSession multi = new IncomingMultistreamSelectSession();
 
 	boolean id_sent = false;
+	
+	DHTPlugin dht = null;			// If we're accepting DHT
 
 	public HandlerIncoming(IPFSIOPlugin i) {
 		iop = i;	
@@ -26,6 +29,9 @@ public class HandlerIncoming extends IOPlugin {
 		if (multi.hasHandshaked()) {
 			if (multi.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_ID) && !id_sent) {
 				return true;	// We want to send our ID...	
+			}
+			if (multi.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_DHT)) {
+				return dht.wantsToWork();
 			}
 		}
 		return false;
@@ -45,9 +51,11 @@ public class HandlerIncoming extends IOPlugin {
 				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_DHT)) {
 					multi.sendAccept(out);
 					System.out.println("Sent accept for protocol DHT");
-				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_BITSWAP)) {
-					multi.sendAccept(out);
-					System.out.println("Sent accept for protocol BITSWAP");
+					dht = new DHTPlugin(iop);
+					dht.source = "yamuxin";
+//				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_BITSWAP)) {
+//					multi.sendAccept(out);
+//					System.out.println("Sent accept for protocol BITSWAP");
 				} else {
 					multi.sendReject(out);
 					multi.reset();
@@ -77,10 +85,40 @@ public class HandlerIncoming extends IOPlugin {
 			}
 			// Now we can work with the data...
 
+			if (multi.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_DHT)) {
+				System.out.println("Working on yamuxin DHT session... " + in.position());
+				
+				// First copy the in buffer...
+				if (in.position()>0) {
+					in.flip();
+					dht.in.put(in);
+					in.compact();
+				}
+				
+				dht.work();
+				
+				if (dht.out.position()>0) {
+					dht.out.flip();
+					out.put(dht.out);
+					dht.out.compact();
+				}
+				
+				System.out.println("Yamuxin output " + out.position());
+			}
+
 			if (in.position()>0) {
 				System.out.println("INDATA (" + multi.getProtocol().trim() + ") data " + in.position());
 			}
 		}
+		
+		byte[] o = new byte[out.position()];
+		out.flip();
+		out.get(o);
+		out.rewind();
+		out.compact();
+		
+		System.out.println("WRITING " + ByteUtil.toHexString(o));
+		
 	}
 
 	public void closing() {

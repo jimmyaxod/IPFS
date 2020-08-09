@@ -176,7 +176,7 @@ public class IPFSIOPlugin extends IOPlugin {
 		// Once we've done IPFS ID, lets open an outgoing KAD DHT stream.
 		yamux.setupOutgoingStream(new HandlerKADDHT(this));
 	}
-	
+
 	/**
 	 * Deal with Yamux packets...
 	 *

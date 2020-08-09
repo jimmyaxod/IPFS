@@ -129,29 +129,37 @@ public class YamuxSession {
 		while(i.hasNext()) {
 			Integer stream_id = (Integer)i.next();
 			IOPlugin iop = (IOPlugin)activeIOPlugins.get(stream_id);
-			
+
 			if (iop.wantsToWork()) {
 				iop.work();
-				// Check the out buffer...
-				if (iop.out.position()>0) {
-					logger.fine("Yamux our plugin " + stream_id + " wants to write data " + iop.out.position());
-					iop.out.flip();
-					byte[] data = new byte[iop.out.remaining()];
-					iop.out.get(data);
-					iop.out.compact();
-					short flags = 0;
-					if (notSentSYN.contains(stream_id)) {
-						flags = YAMUX_FLAG_SYN;
-						notSentSYN.remove(stream_id);
-					}
+			}
 
-					if (notSentACK.contains(stream_id)) {
-						flags = YAMUX_FLAG_ACK;
-						notSentACK.remove(stream_id);
-					}
+			// Check the out buffer...
+			if (iop.out.position()>0) {
+				if ((stream_id & 1)==0) {
+					// It was an incoming stream...
+					logger.info("Yamux our plugin " + stream_id + " wants to write data " + iop.out.position());
 					
-					writeYamux(out, data, stream_id, flags);
+				} else {
+					// It was an outgoing stream...	
 				}
+//				logger.info("Yamux our plugin " + stream_id + " wants to write data " + iop.out.position());
+				iop.out.flip();
+				byte[] data = new byte[iop.out.remaining()];
+				iop.out.get(data);
+				iop.out.compact();
+				short flags = 0;
+				if (notSentSYN.contains(stream_id)) {
+					flags = YAMUX_FLAG_SYN;
+					notSentSYN.remove(stream_id);
+				}
+
+				if (notSentACK.contains(stream_id)) {
+					flags = YAMUX_FLAG_ACK;
+					notSentACK.remove(stream_id);
+				}
+				
+				writeYamux(out, data, stream_id, flags);
 			}
 		}
 	}

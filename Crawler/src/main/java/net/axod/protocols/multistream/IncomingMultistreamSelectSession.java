@@ -49,7 +49,7 @@ public class IncomingMultistreamSelectSession {
 				// Try to read a complete packet. If we can't we abort so we can try later.
 				try {
 					String l = OutgoingMultistreamSelectSession.readMultistream(in);
-					
+
 					// Move forward...
 					in.compact();
 					in.flip();
