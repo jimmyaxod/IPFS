@@ -64,7 +64,7 @@ public class HandlerIncoming extends IOPlugin {
 		} else {
 			if (multi.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_ID) && !id_sent) {
 				// Their observed address..
-				
+
 				InetSocketAddress isa = iop.node.getInetSocketAddress();
 				boolean isIPv6 = (isa.getAddress() instanceof Inet6Address);
 				
@@ -96,7 +96,7 @@ public class HandlerIncoming extends IOPlugin {
 				}
 
 				dht.work();
-				
+
 				if (dht.out.position()>0) {
 					dht.out.flip();
 					out.put(dht.out);
