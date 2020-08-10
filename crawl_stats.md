@@ -68,3 +68,18 @@
 | /x/                             |   3,301 |
 
 Peers collected in an hour (Small machine, max 2000 concurrent connections):   18,761 unique peerID, 314,277 unique addresses.
+
+11 hour run, 1500 max connections
+
+| Item                                | Count       |
+| ----------------------------------- | ----------- |
+| Total connections attempted         |     830,205 |
+| Of which successful                 |     396,629 |
+|                                     |             |
+| Unique peerIDs handshaked with      |       6,657 |
+| Unique listen addresses from ID     |      27,456 |
+|
+| Raw datapoints collected (findnode) | 125,399,179 |
+| Unique peerIDs                      |      24,478 |
+| Unique addresses                    |             |
+
