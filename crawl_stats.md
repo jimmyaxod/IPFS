@@ -78,7 +78,7 @@ Peers collected in an hour (Small machine, max 2000 concurrent connections):   1
 |                                     |             |
 | Unique peerIDs handshaked with      |       6,657 |
 | Unique listen addresses from ID     |      27,456 |
-|
+|                                     |             |
 | Raw datapoints collected (findnode) | 125,399,179 |
 | Unique peerIDs                      |      24,478 |
 | Unique addresses                    |             |
