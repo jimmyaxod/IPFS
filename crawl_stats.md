@@ -83,3 +83,12 @@ Peers collected in an hour (Small machine, max 2000 concurrent connections):   1
 | Unique peerIDs                      |      24,478 |
 | Unique addresses                    |             |
 
+| DHT packets             | Direction | Count      |
+| ----------------------- | --------- | ---------- |
+| PING                    | Out       |  1,688,139 |
+| FIND_NODE               | Out       |  1,938,847 |
+| PING                    | In        |  1,537,669 |
+| FIND_NODE               | In        |  1,737,279 |
+| PUT_VALUE               | In        |          2 |
+| ADD_PROVIDER            | In        |      3,075 |
+| GET_PROVIDERS           | In        |        520 |
