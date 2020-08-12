@@ -103,10 +103,10 @@ public class TestSecioSession {
 					assertEquals(lla.size(), 1);
 					byte[] data_a = (byte[])lla.get(0);
 					assertTrue(Arrays.equals(data_a, "HELLO WORLD B".getBytes()));
-					
+
 					return;
 				}
-				
+
 				a_secio.process(a_in, a_out, a_mykeys);
 				if (a_out.position()>0) {
 					a_out.flip();

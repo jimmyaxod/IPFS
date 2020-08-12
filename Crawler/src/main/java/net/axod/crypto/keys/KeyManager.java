@@ -3,8 +3,25 @@ package net.axod.crypto.keys;
 import io.ipfs.multihash.*;
 
 import java.security.*;
+import java.util.*;
 
 public class KeyManager {
+	static HashMap<String, KeyPair> keys = new HashMap();	// Cache of name -> keypair
+	
+	/**
+	 * Generates a new keypair, or gets an existing one from the cache...
+	 *
+	 */
+	public static KeyPair getKeyPair(String name) {
+		KeyPair kp = keys.get(name);
+		if (kp==null) {
+			kp = getNewKeys();
+			keys.put(name, kp);
+		}
+		return kp;
+	}
+
+
 	// My RSA keys
 	static KeyPair mykeys = null;	
 
