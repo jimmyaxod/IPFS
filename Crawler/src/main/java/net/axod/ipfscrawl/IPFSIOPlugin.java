@@ -49,7 +49,7 @@ public class IPFSIOPlugin extends IOPlugin {
 	OutgoingMultistreamSelectSession multi_secio = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_SECIO);
 	
 	// This handles a SECIO session
-	public SecioSession secio = new SecioSession();
+	public SecioSession secio = new SecioSession(false);
 
 	// Negotiate multistream yamux
 	OutgoingMultistreamSelectSession multi_yamux = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_YAMUX);

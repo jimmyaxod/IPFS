@@ -51,7 +51,7 @@ public class IPFSIOPluginIn extends IOPlugin {
 				if (proto.equals(OutgoingMultistreamSelectSession.PROTO_SECIO)) {
 					multi_secio.sendAccept(out);
 					System.out.println("Sent accept for secio...");
-					secio = new SecioSession();
+					secio = new SecioSession(true);
 				} else {
 					
 					close();
@@ -62,7 +62,7 @@ public class IPFSIOPluginIn extends IOPlugin {
 			if (multi_secio.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_SECIO)) {
 				try {
 					// Do the secio stuff..
-					LinkedList spackets = secio.processServer(in, out, mykeys);
+					LinkedList spackets = secio.process(in, out, mykeys);
 					if (secio.handshaked()) {
 						for(int i=0;i<spackets.size();i++) {
 							byte[] pack = (byte[])spackets.get(i);

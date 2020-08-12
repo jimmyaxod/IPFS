@@ -27,9 +27,14 @@ import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
  * https://github.com/libp2p/go-libp2p-secio
  *
  *
- * Example usage:
+ * Example usage (Outgoing):
  *		SecioSession secio = new SecioSession();
  * 		LinkedList in_packets = secio.process(in, out, mykeys);
+ *		secio.write(something)
+ *
+ * Example usage (Incoming):
+ *		SecioSession secio = new SecioSession();
+ *		LinkedList in_packets = secio.processServer(in, out, mykeys);
  *		secio.write(something)
  *
  * TODO: Support more exchange, ciphers, hashers
@@ -40,9 +45,10 @@ import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
  */
 public class SecioSession {
     private static Logger logger = Logger.getLogger("net.axod.crypto.secio");
+    
+    private static final int MAX_PACKET_SIZE = 8000000;
 
-    // Are we outgoing, or incoming?
-    private boolean is_outgoing = true;
+    private boolean is_incoming = false;
     
 	private boolean we_are_primary = true;
 
@@ -53,31 +59,38 @@ public class SecioSession {
 	private boolean got_enc_nonce = false;
 	private boolean sent_enc_nonce = false;
 
+	// These are the propose and exchange packets
 	private SecioProtos.Propose local_propose = null;
 	private SecioProtos.Propose remote_propose = null;
 	private SecioProtos.Exchange local_exchange = null;
 	private SecioProtos.Exchange remote_exchange = null;
 
+	// Incoming and outgoing MAC
 	private Mac incoming_HMAC;
 	private Mac outgoing_HMAC;
 	
+	// Incoming and outgoing Ciphers
 	private Cipher incoming_cipher;
 	private Cipher outgoing_cipher;
 
+	// We need BouncyCastle to be able to support some keys.
 	static {
 		Security.addProvider(new BouncyCastleProvider());
 	}
 
 	/**
 	 *
-	 * Create a new session
+	 * Create a new secio session
+	 *
+	 * @param in	If true, then this is an incoming Secio session.
 	 */
-	public SecioSession() {
-	
+	public SecioSession(boolean in) {
+		is_incoming = in;
 	}
 
 	/**
-	 * This decides who is in charge of the connection.
+	 * This decides who is 'in charge' of the connection.
+	 *
 	 *
 	 */
 	private void decideOrder() {
@@ -99,11 +112,11 @@ public class SecioSession {
 			String hash2 = h2.toString();
 			
 			if (hash1.equals(hash2)) {
-				// ABORT! We connected to ourself??!	
+				logger.warning("Secio: We seem to have connected to ourselves?");
 			}
-			
+
 			we_are_primary = (hash1.compareTo(hash2) > 0);
-			
+
 		} catch(java.security.NoSuchAlgorithmException nae) {
 			System.err.println("java.security.NoSuchAlgorithmException");
 			System.exit(-1);	
@@ -115,7 +128,7 @@ public class SecioSession {
 	 * Create a local exchange packet to send out.
 	 * To do this, we need to know our PrivateKey so we can sign using it.
 	 */
-	private void createLocalExchange(PrivateKey privk) throws Exception {
+	private void createLocalExchange(PrivateKey privk) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
 		Timing.enter("Secio.createLocalExchange");
 		// First we need to create EC keypair
 		// Second we need to create a signature
@@ -135,7 +148,7 @@ public class SecioSession {
 		
 		// Now create the signature...
 
-		// TODO: Do we need to support others?
+		// TODO: Support other key types
 		Signature sign = Signature.getInstance("SHA256withRSA");
 
 		sign.initSign(privk);
@@ -228,18 +241,6 @@ public class SecioSession {
 			Timing.leave("Secio.checkSignature");
 		}
 	}
-
-	/**
-	 * Converts an uncompressed secp256r1 / P-256 public point to the EC public key it is representing.
-	 * @param w a 64 byte uncompressed EC point starting with <code>04</code>
-	 * @return an <code>ECPublicKey</code> that the point represents 
-	 */
-	private static ECPublicKey generateP256PublicKeyFromUncompressedW(byte[] w) throws InvalidKeySpecException {
-		if (w[0] != 0x04) {
-			throw new InvalidKeySpecException("w is not an uncompressed key");
-		}
-		return generateP256PublicKeyFromFlatW(Arrays.copyOfRange(w, 1, w.length));
-	}
 	
 	private static byte[] P256_HEAD = Base64.getDecoder().decode("MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE");
 	//MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE		// 36 characters in base64
@@ -271,12 +272,17 @@ public class SecioSession {
 	private void initCiphersMacs() throws Exception {
 		Timing.enter("secio.initCiphersMacs");
 
+		// TODO: Support other cipher/hashers...
 		String cipher = "AES-256";
 		String hasher = "SHA256";
 		
 		BigInteger ec_priv = ((ECPrivateKey)ec_keys.getPrivate()).getS();
 
-		ECPublicKey their_pub = generateP256PublicKeyFromUncompressedW(remote_exchange.getEpubkey().toByteArray());
+		byte[] theirEpubkey = remote_exchange.getEpubkey().toByteArray();
+		if (theirEpubkey[0] != 0x04) {
+			throw new InvalidKeySpecException("theirEpubkey is not an uncompressed key");
+		}
+		ECPublicKey their_pub = generateP256PublicKeyFromFlatW(Arrays.copyOfRange(theirEpubkey, 1, theirEpubkey.length));
 
 		// Next we need to perform (their_pub * ec_priv) which will create a new ECPoint
 
@@ -388,13 +394,14 @@ public class SecioSession {
 
 		incoming_HMAC = Mac.getInstance("Hmac" + hasher);
 		incoming_HMAC.init(new SecretKeySpec(rmac, "Hmac" + hasher));
-		outgoing_HMAC = Mac.getInstance("Hmac" + hasher);
-		outgoing_HMAC.init(new SecretKeySpec(lmac, "Hmac" + hasher));
-
 		incoming_cipher = Cipher.getInstance("AES/CTR/NoPadding");
 		incoming_cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(rkey, "AES"), new IvParameterSpec(riv));
+
+		outgoing_HMAC = Mac.getInstance("Hmac" + hasher);
+		outgoing_HMAC.init(new SecretKeySpec(lmac, "Hmac" + hasher));
 		outgoing_cipher = Cipher.getInstance("AES/CTR/NoPadding");
 		outgoing_cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(lkey, "AES"), new IvParameterSpec(liv));
+		
 		logger.fine("Secio: Have initialized HMAC and ciphers");
 		Timing.leave("secio.initCiphersMacs");
 	}
@@ -429,6 +436,18 @@ public class SecioSession {
 	}
 
 	/**
+	 * General process
+	 *
+	 */
+	public LinkedList process(ByteBuffer in, ByteBuffer out, KeyPair mykeys) throws SecioException {
+		if (is_incoming) {
+			return processIncoming(in, out, mykeys);	
+		} else {
+			return processOutgoing(in, out, mykeys);
+		}
+	}
+	
+	/**
 	 * Process some incomming data on this session...
 	 * In PROPOSE
 	 * Out PROPOSE
@@ -442,13 +461,13 @@ public class SecioSession {
 	 *
 	 * @returns	LinkedList of incoming packets
 	 */
-	public LinkedList process(ByteBuffer in, ByteBuffer out, KeyPair mykeys) throws SecioException {
+	private LinkedList processOutgoing(ByteBuffer in, ByteBuffer out, KeyPair mykeys) throws SecioException {
 		LinkedList inq = new LinkedList();
 		while(in.position()>0) {
 			in.flip();
 			try {
 				int len = in.getInt();		// Length is 32bit int
-				if (len>8000000) {
+				if (len>MAX_PACKET_SIZE) {
 					logger.warning("Got a packet of >8MB?");
 					throw new SecioException("Packet of >8MB");
 				}
@@ -552,7 +571,7 @@ public class SecioSession {
 	 *
 	 * @returns	LinkedList of incoming packets
 	 */
-	public LinkedList processServer(ByteBuffer in, ByteBuffer out, KeyPair mykeys) throws SecioException {
+	private LinkedList processIncoming(ByteBuffer in, ByteBuffer out, KeyPair mykeys) throws SecioException {
 		if (local_propose==null) {
 			createLocalPropose(mykeys.getPublic().getEncoded(), "P-256", "AES-256", "SHA256");							
 			logger.fine("Secio local propose\n" + local_propose);							
