@@ -9,21 +9,25 @@ public class KeyManager {
 	static KeyPair mykeys = null;	
 
 	static {
-        // TODO: Allow reusing previous keys. These should be stored and reused.
-        try {
+		mykeys = getNewKeys();
+	}
+
+	public static KeyPair getNewKeys() {
+        KeyPair kp = null;
+		try {
         	KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
         	SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
 
         	keyGen.initialize(2048, random);
 
-        	mykeys = keyGen.generateKeyPair();
-
+        	kp = keyGen.generateKeyPair();
         } catch(Exception e) {
         	System.err.println("Can't generate keys! " + e);
         	System.exit(-1);
-        }		
+        }
+        return kp;
 	}
-
+	
 	/**
 	 * Get a keypair to use. For now we just create one...
 	 *
@@ -58,5 +62,4 @@ public class KeyManager {
 		}
 		return h;
 	}
-	
 }
