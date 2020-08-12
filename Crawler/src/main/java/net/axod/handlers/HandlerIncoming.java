@@ -6,6 +6,7 @@ import net.axod.ipfscrawl.*;
 import net.axod.crypto.keys.*;
 import net.axod.protocols.plugins.*;
 import net.axod.util.*;
+import net.axod.pb.*;
 
 import io.ipfs.multiaddr.*;
 
@@ -53,9 +54,9 @@ public class HandlerIncoming extends IOPlugin {
 					System.out.println("Sent accept for protocol DHT");
 					dht = new DHTPlugin(client);
 					dht.source = "yamuxin";
-//				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_BITSWAP)) {
-//					multi.sendAccept(out);
-//					System.out.println("Sent accept for protocol BITSWAP");
+				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_BITSWAP)) {
+					multi.sendAccept(out);
+					System.out.println("Sent accept for protocol BITSWAP");
 				} else {
 					multi.sendReject(out);
 					multi.reset();
@@ -104,6 +105,24 @@ public class HandlerIncoming extends IOPlugin {
 				}
 				
 				//System.out.println("IN DHT Yamuxin output " + out.position());
+			}
+
+			if (multi.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_BITSWAP)) {
+				if (in.position()>0) {
+					in.flip();
+					int ll = (int)OutgoingMultistreamSelectSession.readVarInt(in);
+					byte[] dat = new byte[ll];
+					in.get(dat);
+					in.compact();
+					
+					try {
+						Bitswap.Message m = Bitswap.Message.parseFrom(dat);
+						
+						Crawl.outputs.writeFile("data_bitswap", now + "," + m + "\n");
+					} catch(Exception e) {
+						System.err.println("Exception bitswap " + e);	
+					}
+				}
 			}
 		}
 

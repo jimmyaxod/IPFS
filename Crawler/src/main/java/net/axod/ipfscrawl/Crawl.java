@@ -49,7 +49,11 @@ public class Crawl implements IOCoreListener {
 					System.out.println(" --dest <host> <port>");
 					System.out.println(" --listen <host> <port>");
 					System.out.println(" --max <num>");
+					System.out.println(" --logs <dir>");
 					System.exit(0);
+				} else if (args[i].equals("--logs")) {
+					i++;
+					outputs.FILE_DIR = args[i] + "/";
 				} else if (args[i].equals("--max")) {
 					i++;
 					max_size = Integer.parseInt(args[i]);
