@@ -79,7 +79,7 @@ public class IPFSIOPlugin extends IOPlugin {
         Crawl.registerConnection(host);        
 
 		// Setup client
-		client.node = this.node;
+		client.node = n;
 		client.secio = secio;
         client.host = this.host;
         client.iop = this;
