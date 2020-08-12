@@ -19,7 +19,9 @@ public class IPFSIOPluginIn extends IOPlugin {
 	IncomingMultistreamSelectSession multi_secio = new IncomingMultistreamSelectSession();
 	IncomingMultistreamSelectSession multi_yamux = new IncomingMultistreamSelectSession();
 
-	YamuxSession yamux = new YamuxSession(new HandlerIncomingFactory(null), false);	// For now...		
+	ClientDetails client = new ClientDetails();
+	
+	YamuxSession yamux = new YamuxSession(new HandlerIncomingFactory(client), false);	// For now...		
 	ByteBuffer yamuxInbuffer = ByteBuffer.allocate(200000);
 	
 	// My RSA keys
@@ -34,6 +36,9 @@ public class IPFSIOPluginIn extends IOPlugin {
 
 	public IPFSIOPluginIn(Node n, InetSocketAddress isa) {
 		System.out.println("INCOMING CONNECTION " + n + " on " + isa);
+		
+		client.node = n;
+		client.host = n.getInetSocketAddress().getAddress().getHostAddress();
 	}
 
 	public boolean wantsToWork() {
@@ -52,6 +57,7 @@ public class IPFSIOPluginIn extends IOPlugin {
 					multi_secio.sendAccept(out);
 					System.out.println("Sent accept for secio...");
 					secio = new SecioSession(true);
+					client.secio = secio;
 				} else {
 					
 					close();
@@ -87,7 +93,6 @@ public class IPFSIOPluginIn extends IOPlugin {
 				}
 			}
 			sent_secio_starter = true;
-			// TODO: Data processing goes here...
 		}		
 	}
 
@@ -111,7 +116,6 @@ public class IPFSIOPluginIn extends IOPlugin {
 			processYamuxPackets(yamuxInbuffer);
 
 			// We have some in data...
-			System.out.println("Yamux in data " + yamuxInbuffer.position());
 		}
 		
 		// Send any multistream handshake stuff to next layer
