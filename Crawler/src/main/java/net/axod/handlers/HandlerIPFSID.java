@@ -29,10 +29,10 @@ public class HandlerIPFSID extends IOPlugin {
 	boolean sent_handshake = false;
 
 	// For now...
-	IPFSIOPlugin iop;
+	ClientDetails client;
 	
-	public HandlerIPFSID(IPFSIOPlugin i) {
-		this.iop = i;	
+	public HandlerIPFSID(ClientDetails i) {
+		client = i;	
 	}
 	
     public void work() {
@@ -70,11 +70,11 @@ public class HandlerIPFSID extends IOPlugin {
 							protocols+=pro;
 						}
 	
-						byte[] pubkey = iop.secio.getRemotePublicKey();
+						byte[] pubkey = client.secio.getRemotePublicKey();
 						String peerID = KeyManager.getPeerID(pubkey).toString();
 
 						long now = System.currentTimeMillis();
-						Crawl.outputs.writeFile("ids", now + "," + iop.host + "," + peerID + "," + agentVersion + "," + protocolVersion + "," + protocols + "\n");
+						Crawl.outputs.writeFile("ids", now + "," + client.host + "," + peerID + "," + agentVersion + "," + protocolVersion + "," + protocols + "\n");
 
 						// Log the listenAddrs...
 
@@ -91,7 +91,8 @@ public class HandlerIPFSID extends IOPlugin {
 						
 						close();
 						
-						iop.openDHTStream();
+						// TODO: Make this better...
+						if (client.iop!=null) client.iop.openDHTStream();
 					} catch(Exception e) {
 						// Issue working with ident...	
 					}

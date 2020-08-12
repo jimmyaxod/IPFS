@@ -43,6 +43,8 @@ import javax.crypto.spec.*;
 public class IPFSIOPlugin extends IOPlugin {
     private static Logger logger = Logger.getLogger("net.axod.ipfscrawl");
 
+    private ClientDetails client = new ClientDetails();
+    
     public String host = null;
 
     // Negotiate multistream secio
@@ -55,18 +57,18 @@ public class IPFSIOPlugin extends IOPlugin {
 	OutgoingMultistreamSelectSession multi_yamux = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_YAMUX);
 	
 	ByteBuffer yamuxInbuffer = ByteBuffer.allocate(200000);
-	YamuxSession yamux = new YamuxSession(new HandlerIncomingFactory(this));	
+	YamuxSession yamux = new YamuxSession(new HandlerIncomingFactory(client), true);	
 	boolean sentInitYamux = false;
 
 	// My RSA keys
 	static KeyPair mykeys = null;	
 
 	static {
-		mykeys = KeyManager.getKeys();
+		mykeys = KeyManager.getKeys();		
 	}
 	
 	/**
-	 * Create a new plugin to handle a connection.
+	 * Create a new plugin to handle a connection.       
 	 *
 	 */
 	public IPFSIOPlugin(Node n, InetSocketAddress isa) {
@@ -75,6 +77,12 @@ public class IPFSIOPlugin extends IOPlugin {
         
         host = (String)n.properties.get("host");
         Crawl.registerConnection(host);        
+
+		// Setup client
+		client.node = this.node;
+		client.secio = secio;
+        client.host = this.host;
+        client.iop = this;
 	}
 
 	private long ctime = System.currentTimeMillis();
@@ -178,13 +186,13 @@ public class IPFSIOPlugin extends IOPlugin {
 
 	private void initYamuxStreams() {		
 		// Start with an IPFS/ID stream.
-		yamux.setupOutgoingStream(new HandlerIPFSID(this));
+		yamux.setupOutgoingStream(new HandlerIPFSID(client));
 	}
 
 	//
 	public void openDHTStream() {
 		// Once we've done IPFS ID, lets open an outgoing KAD DHT stream.
-		yamux.setupOutgoingStream(new HandlerKADDHT(this));
+		yamux.setupOutgoingStream(new HandlerKADDHT(client));
 	}
 
 	/**

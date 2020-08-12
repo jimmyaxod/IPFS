@@ -6,13 +6,13 @@ import net.axod.ipfscrawl.*;
 import java.net.*;
 
 public class HandlerIncomingFactory implements IOPluginFactory {
-	IPFSIOPlugin iop = null;
+	ClientDetails client = null;
 	
-	public HandlerIncomingFactory(IPFSIOPlugin i) {
-		iop = i;	
+	public HandlerIncomingFactory(ClientDetails i) {
+		client = i;	
 	}
 	
     public IOPlugin getIOPlugin(Node node, InetSocketAddress isa) {
-    	return new HandlerIncoming(iop);	
+    	return new HandlerIncoming(client);
     }
 }

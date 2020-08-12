@@ -13,16 +13,16 @@ import java.nio.*;
 import java.net.*;
 
 public class HandlerIncoming extends IOPlugin {
-	IPFSIOPlugin iop = null;
-
+	ClientDetails client = null;
+	
 	IncomingMultistreamSelectSession multi = new IncomingMultistreamSelectSession();
 
 	boolean id_sent = false;
 	
 	DHTPlugin dht = null;			// If we're accepting DHT
 
-	public HandlerIncoming(IPFSIOPlugin i) {
-		iop = i;	
+	public HandlerIncoming(ClientDetails i) {
+		client = i;	
 	}
 
 	public boolean wantsToWork() {
@@ -51,7 +51,7 @@ public class HandlerIncoming extends IOPlugin {
 				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_DHT)) {
 					multi.sendAccept(out);
 					System.out.println("Sent accept for protocol DHT");
-					dht = new DHTPlugin(iop);
+					dht = new DHTPlugin(client);
 					dht.source = "yamuxin";
 //				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_BITSWAP)) {
 //					multi.sendAccept(out);
@@ -65,7 +65,7 @@ public class HandlerIncoming extends IOPlugin {
 			if (multi.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_ID) && !id_sent) {
 				// Their observed address..
 
-				InetSocketAddress isa = iop.node.getInetSocketAddress();
+				InetSocketAddress isa = client.node.getInetSocketAddress();
 				boolean isIPv6 = (isa.getAddress() instanceof Inet6Address);
 				
 				MultiAddress observed = new MultiAddress("/ip" + (isIPv6?"6":"4") + "/" + isa.getAddress().getHostAddress() + "/tcp/" + isa.getPort());
@@ -73,10 +73,10 @@ public class HandlerIncoming extends IOPlugin {
 				//System.out.println("Observed " + observed.toString());
 
 				try {
-					String local_peerID = KeyManager.getPeerID(iop.secio.getLocalPublicKey()).toString();
-					String remote_peerID = KeyManager.getPeerID(iop.secio.getRemotePublicKey()).toString();
+					String local_peerID = KeyManager.getPeerID(client.secio.getLocalPublicKey()).toString();
+					String remote_peerID = KeyManager.getPeerID(client.secio.getRemotePublicKey()).toString();
 	
-					byte[] multi_data2 = IdentifyPlugin.getIdentify(iop.secio.getLocalPublicKey(), local_peerID, remote_peerID, observed);
+					byte[] multi_data2 = IdentifyPlugin.getIdentify(client.secio.getLocalPublicKey(), local_peerID, remote_peerID, observed);
 					out.put(multi_data2);
 				} catch(Exception e) {
 					System.err.println("Exception constructing identify packet");	

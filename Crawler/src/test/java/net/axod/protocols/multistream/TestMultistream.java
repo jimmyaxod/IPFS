@@ -35,7 +35,7 @@ public class TestMultistream {
 				b_in.put(a_out);
 				a_out.compact();
 			}
-			
+
 			String b_protocol = b_multi.process(b_in, b_out);
 			if (b_out.position()>0) {
 				b_out.flip();
@@ -45,7 +45,7 @@ public class TestMultistream {
 			if (b_protocol!=null) {
 				System.out.println("Protocol [" + b_protocol + "]");
 				assertEquals(b_protocol, OutgoingMultistreamSelectSession.PROTO_SECIO);
-				
+
 				// NB Haven't completed handshake fully yet
 				return;
 			}

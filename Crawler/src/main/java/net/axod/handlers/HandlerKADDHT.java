@@ -45,7 +45,7 @@ public class HandlerKADDHT extends IOPlugin {
 		return dht.wantsToWork();
 	}
 	
-	public HandlerKADDHT(IPFSIOPlugin i) {
+	public HandlerKADDHT(ClientDetails i) {
 		dht = new DHTPlugin(i);
 	}
 	

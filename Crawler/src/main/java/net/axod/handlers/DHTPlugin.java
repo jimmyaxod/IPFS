@@ -43,10 +43,10 @@ public class DHTPlugin extends IOPlugin {
 	}
 	
 	// For now...
-	IPFSIOPlugin iop;
+	ClientDetails client;
 	
-	public DHTPlugin(IPFSIOPlugin i) {
-		this.iop = i;	
+	public DHTPlugin(ClientDetails i) {
+		client = i;	
 	}
 	
     public void work() {
