@@ -7,9 +7,10 @@ For now, this will be limited to TCP transport. I'm going to be looking at the D
 * Secio (Working) [RSA, ECDSA, Ed25519] TODO Secp256k1
 * Yamux multiplexing (Working, needs formalizing)
 * Crawling the DHT by random walk (Working)
+* Parsing and logging BITSWAP messages (working)
+* Incoming TCP connections (working)
 * Listening for requests by operating in 'server' mode on the DHT (TODO)
-* Incoming TCP connections (Started)
-* BITSWAP, circuit relay etc
+* circuit relay etc
 
 Aims
  * Insight into who is using IPFS, geography, orgs, etc
