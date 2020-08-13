@@ -92,3 +92,12 @@ Peers collected in an hour (Small machine, max 2000 concurrent connections):   1
 | PUT_VALUE               | In        |          2 |
 | ADD_PROVIDER            | In        |      3,075 |
 | GET_PROVIDERS           | In        |        520 |
+
+## Incoming connection first protocol requests (Encryption selection)
+
+| Protocol        | Count |
+| --------------- | ----- |
+| /secio/1.0.0    | 1,730 |
+| /tls/1.0.0      |   387 |
+| /noise          |   176 |
+
