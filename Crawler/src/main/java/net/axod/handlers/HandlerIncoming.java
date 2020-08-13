@@ -9,6 +9,7 @@ import net.axod.util.*;
 import net.axod.pb.*;
 
 import io.ipfs.multiaddr.*;
+import io.ipfs.multihash.*;
 import io.ipfs.cid.*;
 
 import java.nio.*;
@@ -130,13 +131,32 @@ public class HandlerIncoming extends IOPlugin {
 							byte[] block = entry.getBlock().toByteArray();
 							
 							Cid c = Cid.cast(block);
+							Multihash mh = (Multihash)c;
+
+							int priority = entry.getPriority();
+							boolean cancel = entry.getCancel();
+							boolean sendDontHave = entry.getSendDontHave();
+							Bitswap.Message.Wantlist.WantType wantType = entry.getWantType();
+//							System.out.println("BLOCK ver=" + c.version + " codec=" + c.codec + " " + mh);
 							
-							System.out.println("BLOCK " + c);
-							
-							Crawl.outputs.writeFile("data_bitswap", now + "," + entry + "\n");
+							String host = "unknown";
+							String port = "unknown";
+							if (client!=null && client.node!=null) {
+								host = client.node.getInetSocketAddress().getAddress().getHostAddress();
+								port = Integer.toString(client.node.getInetSocketAddress().getPort());
+							}
+
+							Crawl.outputs.writeFile("data_bitswap", now + "," + host + "," + port
+								+ "," + c.version + "," + c.codec + "," + mh
+								+ "," + priority
+								+ "," + cancel
+								+ "," + sendDontHave
+								+ "," + wantType
+								+ "\n");
 						}
 					} catch(Exception e) {
-						System.err.println("Exception bitswap " + e);	
+						System.err.println("Exception bitswap " + e);
+						e.printStackTrace();
 					}
 				}
 			}
