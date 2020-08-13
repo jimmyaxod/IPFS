@@ -9,9 +9,11 @@ import net.axod.util.*;
 import net.axod.pb.*;
 
 import io.ipfs.multiaddr.*;
+import io.ipfs.cid.*;
 
 import java.nio.*;
 import java.net.*;
+import java.util.*;
 
 public class HandlerIncoming extends IOPlugin {
 	ClientDetails client = null;
@@ -117,8 +119,22 @@ public class HandlerIncoming extends IOPlugin {
 					
 					try {
 						Bitswap.Message m = Bitswap.Message.parseFrom(dat);
+
+						Bitswap.Message.Wantlist wl = m.getWantlist();
 						
-						Crawl.outputs.writeFile("data_bitswap", now + "," + m + "\n");
+						// Now get the entries...
+						Iterator i = wl.getEntriesList().iterator();
+						while(i.hasNext()) {
+							Bitswap.Message.Wantlist.Entry entry = (Bitswap.Message.Wantlist.Entry)i.next();
+							
+							byte[] block = entry.getBlock().toByteArray();
+							
+							Cid c = Cid.cast(block);
+							
+							System.out.println("BLOCK " + c);
+							
+							Crawl.outputs.writeFile("data_bitswap", now + "," + entry + "\n");
+						}
 					} catch(Exception e) {
 						System.err.println("Exception bitswap " + e);	
 					}

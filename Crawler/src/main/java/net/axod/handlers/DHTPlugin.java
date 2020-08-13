@@ -113,7 +113,7 @@ public class DHTPlugin extends IOPlugin {
 					Iterator i = msg.getCloserPeersList().iterator();
 					while(i.hasNext()) {
 						DHTProtos.Message.Peer closer = (DHTProtos.Message.Peer)i.next();
-						Multihash id = new Multihash(closer.getId().toByteArray());
+						Multihash id = Multihash.deserialize(closer.getId().toByteArray());
 						//System.out.println("PEER " + id);
 						
 						// Parse the addrs, and see if we can connect to anything...
