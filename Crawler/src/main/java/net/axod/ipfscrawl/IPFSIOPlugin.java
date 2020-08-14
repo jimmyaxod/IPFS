@@ -47,6 +47,11 @@ public class IPFSIOPlugin extends IOPlugin {
     
     public String host = null;
 
+    public String crypto = "noise";		// or secio...
+    
+    OutgoingMultistreamSelectSession multi_noise = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_NOISE);
+    
+    
     // Negotiate multistream secio
 	OutgoingMultistreamSelectSession multi_secio = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_SECIO);
 	
@@ -95,10 +100,15 @@ public class IPFSIOPlugin extends IOPlugin {
 	 */
 	public boolean wantsToWork() {
 		// If we're at this stage, we need to send a multistream select...
-		if (!multi_secio.sent_handshake) {
+		
+		if (crypto.equals("secio") && !multi_secio.sent_handshake) {
 		 	return true;
 		}
 
+		if (crypto.equals("noise") && !multi_noise.sent_handshake) {
+		 	return true;
+		}
+		
 		if (secio.handshaked() && !multi_yamux.sent_handshake) {
 			return true;	
 		}
@@ -117,9 +127,15 @@ public class IPFSIOPlugin extends IOPlugin {
 			close();
 			return;
 		}
+
+		// ======== multistream select scio ================================
+		if (crypto.equals("noise") && multi_noise.process(in, out)) {
+			// Now we have to do the noise protocol stuff...
+			System.out.println("NOISE DATA " + in.position());
+		}
 		
 		// ======== multistream select scio ================================
-		if (multi_secio.process(in, out)) {
+		if (crypto.equals("secio") && multi_secio.process(in, out)) {
 			try {
 				LinkedList spackets = secio.process(in, out, mykeys);
 				

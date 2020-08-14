@@ -62,34 +62,38 @@ public class OutgoingMultistreamSelectSession {
 		if (!sent_handshake) {
 			//System.out.println("MULTISTREAM SELECT " + proto);
 			writeMultistream(out, MULTISTREAM);						
-			writeMultistream(out, proto);		
+			writeMultistream(out, proto);
 			sent_handshake = true;
 		}
 		
 		if (!handshaked) {
 			// We haven't performed the multistream handshake yet, so we should do that now.
-			in.flip();
-			
-			// Try to read a complete packet. If we can't we abort so we can try later.
-			try {
-				String l = readMultistream(in);	
-				logger.fine("Multistream handshake (" + l.trim() + ")");
-
-				// For now, we only support multistream/1.0.0
+			while(in.position()>0) {
+				in.flip();
 				
-				// TODO: FIXME
-				if (l.equals(MULTISTREAM)) {
-					// OK, as expected, lets reply and progress...
-
-				} else if (l.equals(proto)) {
-					// OK, need to move on to next stage now...
-					handshaked = true;
-					logger.fine("Switching to " + proto);
+				// Try to read a complete packet. If we can't we abort so we can try later.
+				try {
+					String l = readMultistream(in);	
+					logger.info("Multistream handshake (" + l.trim() + ")");
+	
+					// For now, we only support multistream/1.0.0
+					
+					// TODO: FIXME
+					if (l.equals(MULTISTREAM)) {
+						// OK, as expected, lets reply and progress...
+	
+					} else if (l.equals(proto)) {
+						// OK, need to move on to next stage now...
+						handshaked = true;
+						logger.fine("Switching to " + proto);
+						break;
+					}
+				} catch(BufferUnderflowException bue) {
+					in.rewind();	// Partial packet. We'll try and read again later...
+					break;
 				}
-			} catch(BufferUnderflowException bue) {
-				in.rewind();	// Partial packet. We'll try and read again later...
+				in.compact();
 			}
-			in.compact();
 		}
 		return handshaked;		
 	}
