@@ -1,0 +1,11 @@
+syntax = "proto3";
+package pb;
+
+option java_package = "net.axod.pb";
+option java_outer_classname = "NoisePayload";
+
+message NoiseHandshakePayload {
+	bytes identity_key = 1;
+	bytes identity_sig = 2;
+	bytes data = 3;
+}

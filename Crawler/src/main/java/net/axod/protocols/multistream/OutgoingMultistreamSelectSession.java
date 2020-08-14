@@ -23,7 +23,7 @@ public class OutgoingMultistreamSelectSession {
 	public final static String PROTO_NA = "na\n";
 	// Crypto
 	public final static String PROTO_SECIO = "/secio/1.0.0\n";
-	public final static String PROTO_SECIO = "/noise\n";
+	public final static String PROTO_NOISE = "/noise\n";
 	
 	// Mux
 	public final static String PROTO_YAMUX = "/yamux/1.0.0\n";
