@@ -21,7 +21,7 @@ public class IncomingMultistreamSelectSession {
     public String getProtocol() {
     	return recv_protocol;	
     }
-    
+
     public void reset() {
     	handshaked = false;
     	recv_multistream = false;

@@ -1,6 +1,7 @@
 package net.axod.ipfscrawl;
 
 import net.axod.io.*;
+import net.axod.util.*;
 import net.axod.ipfscrawl.*;
 import net.axod.protocols.multistream.*;
 import net.axod.protocols.yamux.*;
@@ -58,6 +59,11 @@ public class IPFSIOPluginIn extends IOPlugin {
 					System.out.println("Sent accept for secio...");
 					secio = new SecioSession(true);
 					client.secio = secio;
+				} else if (proto.equals(OutgoingMultistreamSelectSession.PROTO_NOISE)) {
+					multi_secio.sendAccept(out);
+					System.out.println("Sent accept for noise...");
+					
+					// OK...
 				} else {
 					
 					close();
@@ -65,7 +71,15 @@ public class IPFSIOPluginIn extends IOPlugin {
 				}
 			}
 		} else {
-			if (multi_secio.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_SECIO)) {
+			if (multi_secio.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_NOISE)) {
+				if (in.position()>0) {
+					in.flip();
+					byte[] a = new byte[in.remaining()];
+					in.compact();
+					System.out.println("NOISE DATA " + ByteUtil.toHexString(a));
+				}
+			
+			} else if (multi_secio.getProtocol().equals(OutgoingMultistreamSelectSession.PROTO_SECIO)) {
 				try {
 					// Do the secio stuff..
 					LinkedList spackets = secio.process(in, out, mykeys);

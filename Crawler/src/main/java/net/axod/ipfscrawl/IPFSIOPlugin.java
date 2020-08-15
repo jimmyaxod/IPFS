@@ -47,7 +47,7 @@ public class IPFSIOPlugin extends IOPlugin {
     
     public String host = null;
 
-    public String crypto = "noise";		// or secio...
+    public String crypto = "secio";		// or secio...
     
     OutgoingMultistreamSelectSession multi_noise = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_NOISE);
     
@@ -131,9 +131,14 @@ public class IPFSIOPlugin extends IOPlugin {
 		// ======== multistream select scio ================================
 		if (crypto.equals("noise") && multi_noise.process(in, out)) {
 			// Now we have to do the noise protocol stuff...
-			System.out.println("NOISE DATA " + in.position());
+			if (in.position()>0) {
+				in.flip();
+				byte[] a = new byte[in.remaining()];
+				in.compact();
+				System.out.println("NOISE DATA " + ByteUtil.toHexString(a));
+			}
 		}
-		
+
 		// ======== multistream select scio ================================
 		if (crypto.equals("secio") && multi_secio.process(in, out)) {
 			try {

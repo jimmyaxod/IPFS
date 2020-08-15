@@ -14,6 +14,8 @@ import java.util.logging.*;
  * if (multi_secio.process(in, out)) {
  *     //do next thing inside secio
  *
+ *
+ * TODO: Handle downgrading. eg try noise, if unavailable try secio.
  */
 
 public class OutgoingMultistreamSelectSession {
@@ -65,19 +67,19 @@ public class OutgoingMultistreamSelectSession {
 			writeMultistream(out, proto);
 			sent_handshake = true;
 		}
-		
+
 		if (!handshaked) {
 			// We haven't performed the multistream handshake yet, so we should do that now.
 			while(in.position()>0) {
 				in.flip();
-				
+
 				// Try to read a complete packet. If we can't we abort so we can try later.
 				try {
 					String l = readMultistream(in);	
-					logger.info("Multistream handshake (" + l.trim() + ")");
+					logger.fine("Multistream handshake (" + l.trim() + ")");
 	
 					// For now, we only support multistream/1.0.0
-					
+
 					// TODO: FIXME
 					if (l.equals(MULTISTREAM)) {
 						// OK, as expected, lets reply and progress...
@@ -86,10 +88,12 @@ public class OutgoingMultistreamSelectSession {
 						// OK, need to move on to next stage now...
 						handshaked = true;
 						logger.fine("Switching to " + proto);
+						in.compact();
 						break;
 					}
 				} catch(BufferUnderflowException bue) {
 					in.rewind();	// Partial packet. We'll try and read again later...
+					in.compact();
 					break;
 				}
 				in.compact();
@@ -105,6 +109,7 @@ public class OutgoingMultistreamSelectSession {
 	 * @param	data	Message to write
 	 */
 	public static void writeMultistream(ByteBuffer dest, String data) {
+		System.out.println("MULTISTREAM DATA " + data);
 		byte[] d = data.getBytes();
 		writeVarInt(dest, d.length);
 		dest.put(d);
