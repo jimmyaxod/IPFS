@@ -21,7 +21,18 @@ Additionally, A could send 'ls' after the Multistream, to list available protoco
 
 More information can be found here https://github.com/multiformats/multistream-select/
 
-## Overview
+## Security
+
+Security is pretty important, and so the first thing we must do with any libp2p connection is secure it against eavesdroppers. There are currently 3 protocols you can use to achieve this.
+
+* TLS
+* Secio https://github.com/libp2p/specs/tree/master/secio
+* Noise
+
+First, we open a connection to a host, then use multistream-select to select an encryption protocol. The example above shows us asking for secio. However, secio will soon be dropped from support. So, we must move to Noise or TLS.
+
+
+
 
 To play with IPFS, we need to jump through several hoops. This is not a simple protocol like BitTorrent, or HTTP. It has several layers.
 
