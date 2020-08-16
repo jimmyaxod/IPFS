@@ -60,7 +60,7 @@ public class DHTPlugin extends IOPlugin {
 			OutgoingMultistreamSelectSession.writeVarInt(out, multi_data.length);
 			out.put(multi_data);
 			DHTMetrics.incSentType(DHTProtos.Message.MessageType.PING.toString());
-			lastPingTime = now;	
+			lastPingTime = now;
 		}
 
 		if (now - lastQueryTime > PERIOD_QUERY) {
@@ -141,15 +141,33 @@ public class DHTPlugin extends IOPlugin {
 						}
 					} else if (msgType.equals("PING")) {
 						// TODO: Send a pong
-						Crawl.outputs.writeFile("dht_ping", now2 + "," + rhost + "," + rport);
+						Crawl.outputs.writeFile("dht_ping", now2 + "," + rhost + "," + rport + "\n");
 					} else if (msgType.equals("ADD_PROVIDER")) {
-						String key = msg.getKey().toString();
+						String key = ByteUtil.toHexString(msg.getKey().toByteArray());
+						String mhkey = "";
+						try {
+							Multihash mkey = Multihash.deserialize(msg.getKey().toByteArray());
+							mhkey = mkey.toString();
+						} catch(RuntimeException e) {
+							System.err.println("Multihash issue? " + e);	
+						}
+						Crawl.outputs.writeFile("dht_add_provider", now2 + "," + rhost + "," + rport + "," + key + "," + mhkey + "\n");
+
+						//Multihash key = Multihash.deserialize(msg.getKey().toByteArray());
 						// providerPeers
 					} else if (msgType.equals("GET_PROVIDER")) {
-						String key = msg.getKey().toString();
-						Crawl.outputs.writeFile("dht_get_provider", now2 + "," + rhost + "," + rport + "," + key);
+						String key = ByteUtil.toHexString(msg.getKey().toByteArray());
+						String mhkey = "";
+						try {
+							Multihash mkey = Multihash.deserialize(msg.getKey().toByteArray());
+							mhkey = mkey.toString();
+						} catch(RuntimeException e) {
+							System.err.println("Multihash issue? " + e);	
+						}
+						Crawl.outputs.writeFile("dht_get_provider", now2 + "," + rhost + "," + rport + "," + key + "," + mhkey + "\n");
 					}
 				} catch(Exception e) {
+					System.err.println("DHT Exception: " + e);
 					// Issue working with kad...
 				}
 				
