@@ -98,10 +98,16 @@ public class DHTPlugin extends IOPlugin {
 				in.flip();
 				
 				try {
+					// Remote side...
+					String rhost = client.node.getInetSocketAddress().getAddress().getHostAddress();
+					int rport = client.node.getInetSocketAddress().getPort();
+					
 					DHTProtos.Message msg = DHTProtos.Message.parseFrom(idd);
 
-					DHTMetrics.incRecvType(msg.getType().toString());
-					
+					String msgType = msg.getType().toString();
+
+					DHTMetrics.incRecvType(msgType);
+
 					String msg_json = JsonFormat.printer().print(msg);
 					long now2 = System.currentTimeMillis();
 					Crawl.outputs.writeFile("packets", now2 + "," + msg_json + "\n");
@@ -109,28 +115,39 @@ public class DHTPlugin extends IOPlugin {
 		//												System.out.println("-> KAD PACKET " + msg);
 					
 					// Now we need to parse out closerPeers
+					if (msgType.equals("FIND_NODE")) {
 
-					Iterator i = msg.getCloserPeersList().iterator();
-					while(i.hasNext()) {
-						DHTProtos.Message.Peer closer = (DHTProtos.Message.Peer)i.next();
-						Multihash id = Multihash.deserialize(closer.getId().toByteArray());
-						//System.out.println("PEER " + id);
-						
-						// Parse the addrs, and see if we can connect to anything...
-						Iterator j = closer.getAddrsList().iterator();
-						while(j.hasNext()) {
-							byte[] a = ((ByteString)j.next()).toByteArray();
-							try {
-								MultiAddress ma = new MultiAddress(a);
-								Crawl.outputs.writeFile("peers", now + "," + source + "," + id + "," + ma + "\n");
-								
-								// For now, ask Crawl to connect to each one...
-								Crawl.addConnection(ma);
-							} catch(Exception e) {
-								System.err.println("DHT Exception decoding MultiAddress " + ByteUtil.toHexString(a) + " " + e);
-								// Don't care!	
+						Iterator i = msg.getCloserPeersList().iterator();
+						while(i.hasNext()) {
+							DHTProtos.Message.Peer closer = (DHTProtos.Message.Peer)i.next();
+							Multihash id = Multihash.deserialize(closer.getId().toByteArray());
+							//System.out.println("PEER " + id);
+							
+							// Parse the addrs, and see if we can connect to anything...
+							Iterator j = closer.getAddrsList().iterator();
+							while(j.hasNext()) {
+								byte[] a = ((ByteString)j.next()).toByteArray();
+								try {
+									MultiAddress ma = new MultiAddress(a);
+									Crawl.outputs.writeFile("peers", now2 + "," + source + "," + id + "," + ma + "\n");
+									
+									// For now, ask Crawl to connect to each one...
+									Crawl.addConnection(ma);
+								} catch(Exception e) {
+									System.err.println("DHT Exception decoding MultiAddress " + ByteUtil.toHexString(a) + " " + e);
+									// Don't care!	
+								}
 							}
 						}
+					} else if (msgType.equals("PING")) {
+						// TODO: Send a pong
+						Crawl.outputs.writeFile("dht_ping", now2 + "," + rhost + "," + rport);
+					} else if (msgType.equals("ADD_PROVIDER")) {
+						String key = msg.getKey().toString();
+						// providerPeers
+					} else if (msgType.equals("GET_PROVIDER")) {
+						String key = msg.getKey().toString();
+						Crawl.outputs.writeFile("dht_get_provider", now2 + "," + rhost + "," + rport + "," + key);
 					}
 				} catch(Exception e) {
 					// Issue working with kad...
