@@ -1,22 +1,13 @@
 # Protocol
 
-To play with IPFS, we need to jump through several hoops. This is not a simple protocol like BitTorrent, or HTTP. It has several layers.
+## Multistream select
 
-1. Security - For now, we are only going to support secio. This encrypts and signs all messages.
-2. Multiplex - For now, we are only supporting yamux. This allows us to open several different 'streams' within the same connection.
-3. Identify - Allows us to identify who we are communicating with, and send our info to them.
-4. DHT - Finally, we get to play on the DHT.
+The multistream-select protocol is a very simple way for both sides to agree on a protocol to use for the next steps. It's used both at the start or connection to select the crypto, mux, etc. But it's also then used within each mux stream to select things like ID, DHT, BITSWAP, etc
 
-## multistream
-    
-First off, we need to handshake with multistream-select
-Messages are prefixed by the message length as a varint.
-A varint is simply a sequence of bytes, where the MSB signifies if there are more bytes or not. The other 7 bits get combined together to form the value.
-    
-https://github.com/multiformats/multistream-select/
-    
-Example connection handshake
-    
+All multistream messages are prefixed with their length, as a varint. A varint is simply a sequence of bytes, where the MSB signifies if there are more bytes or not. The lower 7 bits are combined together to form the value.
+
+### Example multistream select
+
 | Comment               | A                                     | B                                     |
 | --------------------- | ------------------------------------- | ------------------------------------- |
 | TCP connection        | Connection to B established           |                                       |
@@ -24,7 +15,21 @@ Example connection handshake
 | Multistream           | varint(19), "/multistream/1.0.0\n"    |                                       |
 | Ask for secio         | varint(13), "/secio/1.0.0\n"          |                                       |
 | Agree to secio        |                                       | varint(13), "/secio/1.0.0\n"          |
-    
+
+Alternatively, if B doesn't support the requested protocol, it can reply with 'na\n'. Then A can propose something else.
+Additionally, A could send 'ls' after the Multistream, to list available protocols.
+
+More information can be found here https://github.com/multiformats/multistream-select/
+
+## Overview
+
+To play with IPFS, we need to jump through several hoops. This is not a simple protocol like BitTorrent, or HTTP. It has several layers.
+
+1. Security - For now, we are only going to support secio. This encrypts and signs all messages.
+2. Multiplex - For now, we are only supporting yamux. This allows us to open several different 'streams' within the same connection.
+3. Identify - Allows us to identify who we are communicating with, and send our info to them.
+4. DHT - Finally, we get to play on the DHT.
+        
 ## secio
     
 Next step is to negotiate security.
