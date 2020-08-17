@@ -124,3 +124,17 @@ Peers collected in an hour (Small machine, max 2000 concurrent connections):   1
 | QmZodcg4hZCEHb2K8Soe2tHmzFbVT5AF4ou9ZNVQeAcCXw |     3  |
 | QmR2GXEFLP3z44SYvwMi9gMPCtNLezgd7bZgmd136X4cfF |     3  |
 | QmQ8JpLG5mgRyiUADSzstnnVECk15LvUHdku6w5nANLXAw |     3  |
+
+## Top from bitswap
+
+   4116 DagProtobuf,Qmf4KzgGyYWvcW68mFjLCmhPFoN16ZpQFGFAUe1jDoVWCY
+   2490 DagCbor,zDPWYqFD7DCuvysJLUe7ozewaHJbTNPeMdbuJkmeJvyXtWGKBJ8P
+   2490 DagCbor,zDPWYqFD6AxRg7oPQoxGqxJDZjMJnatjYjR8gPfUkMGBJXZiFUAi
+   2490 DagCbor,zDPWYqFD4jXYp9svjKWgwxmbyM9UTBniBv4q2pA3S79uJL6phAN8
+   2490 DagCbor,zDPWYqFD2jgUvTUdLtLsCMVJotyz6yXhBmRGEFHHPabTwRrmNT3u
+   2490 DagCbor,zDPWYqFD2csg1cTrFoiKQocd3oPniqGBg7SN9m5he1qXoH9KDR2h
+   2490 DagCbor,zDPWYqFD1wjDprA8Qc8YxdF1XiARRwhuB3JAcdpyyT94cpB9pnt4
+   2490 DagCbor,zDPWYqFD1uuAKzUfNUCFk4MUvYaVoxxN8H6vLcqRdRnMPTWiyioL
+   2490 DagCbor,zDPWYqFD1rQ71W16X4K37pzbQLqTYeYovTJcDzQ3jvZ1fTj6JPm9
+   2490 DagCbor,zDPWYqFD1nEvmRmmMg9R3BE5ATw5i7v5nYf4qMdR4NwSWVrdWZFf
+
