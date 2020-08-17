@@ -101,3 +101,26 @@ Peers collected in an hour (Small machine, max 2000 concurrent connections):   1
 | /tls/1.0.0      |   387 |
 | /noise          |   176 |
 
+## Top hashes from ADD_PROVIDER
+
+| Hash                                           | Count  |
+| ---------------------------------------------- | ------ |
+| QmPKJuPcpCXQ6x68RBPWwXqt98ir7GybdxpB6cZEZWCvSs |   115  |
+| QmVzsZXCJivvYaVtRwU2NHWBj4eZkyWbEzT9r1j78UCdi4 |    39  |
+| QmbNoY5efGfHCzKrmSYVCBp2Uob9SVN5p8YFKGaKSTbmnm |    23  |
+| QmZsMSDJ23KxEEvUjq8RDPDhZVkUz2tCvjiRV6BoHfdzg7 |    15  |
+| QmXFiLxZbReV44K5MsxRKxhXKbXaM1oZb6ytwMDeUxssdj |    13  |
+| QmdXHgZ2WiZn2rHvKa4SPvXrgAWsMWjSo8XarVhxp7yUWk |    13  |
+| QmNfq42CqmyDBUdCfjwoM2jY42VPGk2b2KYCTf2Ym3vRaF |    10  |
+| QmXexh7oDpsVEpSqj5ffVYxAhYPD8SBBMmoRAnrzFiuHbF |     9  |
+| QmXN7Z4F9KLZQXDW8Dchu3Fu1SDmWHN1XncdfXNkj3qr1g |     7  |
+| QmVHJxTMy7LcHbQgbRcw7wLSK6hR1YWsNX4d813Ljx7qZZ |     7  |
+| QmfCGpdm3i7HkAZmyUdPq3HNrZvC93uqB1E1TzdseJGg4B |     7  |
+| Qmf3RHEXtDfVcYDZkuF1n23MdV8iX6Jz2Vvr7aU3oSxRtx |     7  |
+| QmTNE34bJptpmnLKVDAkUPSNyZbSJ854BJH6JrM9HrnSjJ |     6  |
+| QmaZa4TEEyTfQZBtv5oyChrS5K7S8gJPsXapQJrgP58N6R |     6  |
+| QmerfWFnYf96Q4GQg5iW2a77kLJMbRJzF7JmTy4bnWunir |     5  |
+| QmXyRj5m7SQWV9gdt7rG1aMiCPvCcpPV2MV7uL2ck5PKQQ |     4  |
+| QmZodcg4hZCEHb2K8Soe2tHmzFbVT5AF4ou9ZNVQeAcCXw |     3  |
+| QmR2GXEFLP3z44SYvwMi9gMPCtNLezgd7bZgmd136X4cfF |     3  |
+| QmQ8JpLG5mgRyiUADSzstnnVECk15LvUHdku6w5nANLXAw |     3  |
