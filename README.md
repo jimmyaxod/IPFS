@@ -1,5 +1,14 @@
 # IPFS
-Playing with IPFS
+Playing with IPFS and libp2p
+
+## Aims
+* Insight into who is using IPFS, geography, orgs, etc. ipv4 vs ipv6, tcp vs quic, different versions, etc
+* Network performance, latency, etc. How much slower than say bittorrent DHT. Node churn, etc
+* General health of the network. Look at node uptime, size of network, etc
+* Nefarious use of the network - bot control channel eg 'Storm'.
+* Implement and maintain libp2p in Java
+* Insight into what content is being shared, search engine, popularity metrics, etc
+
 
 For now, this will be limited to TCP transport. I'm going to be looking at the DHT.
 
@@ -11,12 +20,7 @@ For now, this will be limited to TCP transport. I'm going to be looking at the D
 * Incoming TCP connections (working)
 * Listening for requests by operating in 'server' mode on the DHT (TODO)
 * circuit relay etc
-
-Aims
- * Insight into who is using IPFS, geography, orgs, etc
- * Network performance. Monitor latency, connectivity, uptime, average query time, etc
- * Insight into what content is being shared, individual volumes by hash.
- * Monitor nefarious use of the network - bot control channel eg 'Storm'
+* Noise (TODO)
 
 Comparison with BitTorrent DHT
 
