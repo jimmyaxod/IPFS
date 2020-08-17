@@ -28,13 +28,16 @@ public class DHTPlugin extends IOPlugin {
     private static Logger logger = Logger.getLogger("net.axod.handlers");
 	
     public String source = "out";
-    
+
+    // Can be used to periodically send out pings
 	private long lastPingTime = 0;
 	private long PERIOD_PING = 10*1000;
 
+	// Can be used to periodically send out random find_node to crawl
 	private long lastQueryTime = 0;
 	private long PERIOD_QUERY = 2*1000;
 
+	// Check if we have stuff to do
 	public boolean wantsToWork() {
 		long now = System.currentTimeMillis();
 		if (now - lastPingTime > PERIOD_PING) return true;
@@ -45,13 +48,17 @@ public class DHTPlugin extends IOPlugin {
 	// For now...
 	ClientDetails client;
 	
+	// Create a new DHTPlugin
 	public DHTPlugin(ClientDetails i) {
 		client = i;	
 	}
 	
+	// Do some work
     public void work() {
     	long now = System.currentTimeMillis();
     	logger.fine("DHTPlugin work " + in.position());
+    	
+    	// Send out a ping if we need to
 		if (now - lastPingTime > PERIOD_PING) {
 			DHTProtos.Message msg = DHTProtos.Message.newBuilder()
 							.setType(DHTProtos.Message.MessageType.PING)
@@ -63,12 +70,12 @@ public class DHTPlugin extends IOPlugin {
 			lastPingTime = now;
 		}
 
+		// Send out a random find_node if we need to
 		if (now - lastQueryTime > PERIOD_QUERY) {
 			byte[] digest = new byte[32];
 			for(int i=0;i<digest.length;i++) {
 				digest[i] = (byte)(Math.random()*256);	
 			}
-			
 			Multihash h = new Multihash(Multihash.Type.sha2_256, digest);														
 
 			DHTProtos.Message msg = DHTProtos.Message.newBuilder()
@@ -83,17 +90,18 @@ public class DHTPlugin extends IOPlugin {
 			DHTMetrics.incSentType(DHTProtos.Message.MessageType.FIND_NODE.toString());
 			lastQueryTime = now;
 		}
-    	
-		// Now we can work at the KAD DHT level...
+
+		// Read any incoming KAD packets from the network...
 		in.flip();
 		while(in.remaining()>0) {
 			// Read a varint
 			try {
 				int ll = (int)OutgoingMultistreamSelectSession.readVarInt(in);
+				// TODO: Protection...
 				byte[] idd = new byte[ll];
 				in.get(idd);
 
-				// Progress...
+				// Progress in stream
 				in.compact();
 				in.flip();
 				
@@ -103,7 +111,6 @@ public class DHTPlugin extends IOPlugin {
 					int rport = client.node.getInetSocketAddress().getPort();
 					
 					DHTProtos.Message msg = DHTProtos.Message.parseFrom(idd);
-
 					String msgType = msg.getType().toString();
 
 					DHTMetrics.incRecvType(msgType);
@@ -112,18 +119,15 @@ public class DHTPlugin extends IOPlugin {
 					long now2 = System.currentTimeMillis();
 					Crawl.outputs.writeFile("packets", now2 + "," + msg_json + "\n");
 					
-		//												System.out.println("-> KAD PACKET " + msg);
-					
-					// Now we need to parse out closerPeers
+					// We got a FIND_NODE (Either a reply, or a query)
 					if (msgType.equals("FIND_NODE")) {
 
+						// Go through the closer peers and log them.
 						Iterator i = msg.getCloserPeersList().iterator();
 						while(i.hasNext()) {
 							DHTProtos.Message.Peer closer = (DHTProtos.Message.Peer)i.next();
 							Multihash id = Multihash.deserialize(closer.getId().toByteArray());
-							//System.out.println("PEER " + id);
 							
-							// Parse the addrs, and see if we can connect to anything...
 							Iterator j = closer.getAddrsList().iterator();
 							while(j.hasNext()) {
 								byte[] a = ((ByteString)j.next()).toByteArray();
@@ -140,7 +144,7 @@ public class DHTPlugin extends IOPlugin {
 							}
 						}
 					} else if (msgType.equals("PING")) {
-						// TODO: Send a pong
+						// TODO: Send a pong? How do we know if it's a ping or a pong?
 						Crawl.outputs.writeFile("dht_ping", now2 + "," + rhost + "," + rport + "\n");
 					} else if (msgType.equals("ADD_PROVIDER")) {
 						String key = ByteUtil.toHexString(msg.getKey().toByteArray());
@@ -152,9 +156,6 @@ public class DHTPlugin extends IOPlugin {
 							System.err.println("Multihash issue? " + e);	
 						}
 						Crawl.outputs.writeFile("dht_add_provider", now2 + "," + rhost + "," + rport + "," + key + "," + mhkey + "\n");
-
-						//Multihash key = Multihash.deserialize(msg.getKey().toByteArray());
-						// providerPeers
 					} else if (msgType.equals("GET_PROVIDER")) {
 						String key = ByteUtil.toHexString(msg.getKey().toByteArray());
 						String mhkey = "";

@@ -109,7 +109,7 @@ public class OutgoingMultistreamSelectSession {
 	 * @param	data	Message to write
 	 */
 	public static void writeMultistream(ByteBuffer dest, String data) {
-		System.out.println("MULTISTREAM DATA " + data);
+		//System.out.println("MULTISTREAM DATA " + data);
 		byte[] d = data.getBytes();
 		writeVarInt(dest, d.length);
 		dest.put(d);

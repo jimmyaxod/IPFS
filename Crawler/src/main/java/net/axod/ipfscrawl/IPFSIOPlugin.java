@@ -8,6 +8,7 @@ import net.axod.protocols.plugins.*;
 import net.axod.protocols.multistream.*;
 import net.axod.protocols.yamux.*;
 import net.axod.crypto.secio.*;
+import net.axod.crypto.noise.*;
 import net.axod.crypto.keys.*;
 import net.axod.util.*;
 import net.axod.measurement.*;
@@ -47,10 +48,12 @@ public class IPFSIOPlugin extends IOPlugin {
     
     public String host = null;
 
-    public String crypto = "secio";		// or secio...
+    public String crypto = "noise";		// or secio...
+    boolean sent_noise_opening = false;
     
     OutgoingMultistreamSelectSession multi_noise = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_NOISE);
     
+    public NoiseSession noise = new NoiseSession();
     
     // Negotiate multistream secio
 	OutgoingMultistreamSelectSession multi_secio = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_SECIO);
@@ -130,12 +133,34 @@ public class IPFSIOPlugin extends IOPlugin {
 
 		// ======== multistream select scio ================================
 		if (crypto.equals("noise") && multi_noise.process(in, out)) {
+			
+			if (!sent_noise_opening) {
+				byte[] data = noise.getEncodedPublicKey();
+				out.order(ByteOrder.BIG_ENDIAN);
+				out.putShort((short)data.length);
+				out.put(data);
+				sent_noise_opening = true;	
+				System.out.println("Sent noise key - " + ByteUtil.toHexString(data));
+			}
+
 			// Now we have to do the noise protocol stuff...
 			if (in.position()>0) {
 				in.flip();
-				byte[] a = new byte[in.remaining()];
+
+				in.order(ByteOrder.BIG_ENDIAN);
+				int packet_size = in.getShort();
+				System.out.println("NOISE handshake size " + packet_size);
+				byte[] a = new byte[packet_size];
+				in.get(a);
 				in.compact();
 				System.out.println("NOISE DATA " + ByteUtil.toHexString(a));
+
+				// 32 bytes		-> ne
+				// 32-80 bytes	-> ns
+				// rest			-> ciphertext
+				
+				// Now we should parse the data...
+				
 			}
 		}
 
