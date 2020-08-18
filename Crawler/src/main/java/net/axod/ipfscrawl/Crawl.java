@@ -12,27 +12,23 @@ import java.util.logging.*;
 import io.ipfs.multiaddr.*;
 
 /**
- * Simple tool to play around with IPFS
+ * Simple tool to play around with the IPFS network
  *
  *
  */
-
 public class Crawl implements IOCoreListener {
     private static Logger logger = Logger.getLogger("net.axod.ipfscrawl");
 	private static IOCore io;
 	private static long lastStatus = System.currentTimeMillis();
 	private static long PERIOD_STATUS = 5000;
-	
-	public static FileOutputUtils outputs = new FileOutputUtils();
 
-	// Keep track of current connected hosts
-	public static HashSet currentConnectedHosts = new HashSet();
+	public static FileOutputUtils outputs = new FileOutputUtils();
 	
 	// Max io size
 	private static int max_size = 100;
 	
 	/**
-	 *
+	 * Start a crawl
 	 *
 	 */
 	public static void main(String[] args) {
@@ -41,7 +37,6 @@ public class Crawl implements IOCoreListener {
 			outputs.DO_FLUSHES = true;
 
 			logger.info("Setting up an IOCore");
-
 			io = new IOCore(new Crawl());		// IOCoreListener
 
 			for(int i=0;i<args.length;i++) {
@@ -66,11 +61,11 @@ public class Crawl implements IOCoreListener {
 						Node dest = new Node(new InetSocketAddress(host, port));
 						dest.properties.put("host", host);
 						logger.info("Attempting connection to " + dest + "...");
-	
+
 						IOPluginFactory iof = new IPFSIOPluginFactory();
 						boolean suc = io.addConnection(dest, iof, null);
 					} catch(Exception e) {
-						// Could not connect...	
+						logger.warning("Exception setting up connect " + e);	
 					}
 				} else if (args[i].equals("--listen")) {
 					// Setup a listener on the given host / port...
@@ -78,16 +73,22 @@ public class Crawl implements IOCoreListener {
 					String host = args[i];
 					i++;
 					int port = Integer.parseInt(args[i]);
-					InetSocketAddress isa = new InetSocketAddress(host, port);
-					IOPluginFactory iof = new IPFSIOPluginFactoryIn();
-					io.addListen(isa, iof);
-					
-					// We will also add this to our identify packet
-					IdentifyPlugin.registerListen(host, port);
+					try {
+						InetSocketAddress isa = new InetSocketAddress(host, port);
+						IOPluginFactory iof = new IPFSIOPluginFactoryIn();
+						io.addListen(isa, iof);
+						
+						// We will also add this to our identify packet
+						IdentifyPlugin.registerListen(host, port);
+					} catch(Exception e) {
+						logger.warning("Exception setting up listen " + e);	
+					}
 				}
 			}
 
+			// =================================================================
 			// Make a main status loop...
+			//
 			while(true) {
 				if (System.currentTimeMillis() - lastStatus > PERIOD_STATUS) {
 					logger.info("STATUS " + io);
@@ -96,6 +97,7 @@ public class Crawl implements IOCoreListener {
 					Timing.showTimings();
 					
 					// Check for issues watchdog
+					// This checks on the IO thread to see if it's stalled for some reason.
 					if (io.msSinceSelect() > 10) {
 						// Get a stack trace...
 						logger.warning("### IO ### Thread ### issue ###");
@@ -108,7 +110,7 @@ public class Crawl implements IOCoreListener {
 						    System.err.println(st);
 						}
 					}
-					
+
 					lastStatus = System.currentTimeMillis();
 				} else {
 					Thread.currentThread().sleep(1000);	
@@ -122,51 +124,63 @@ public class Crawl implements IOCoreListener {
 
 	public static long lastExpireTime = 0;
 	public static HashMap recentConnectedHosts = new HashMap();
+	public static long RECENT_CONNECTED_TIME = 30000;
+	public static long RECENT_CONNECTED_EXPIRE_CHECK = 5000;
 	// host -> time
+	// Keep track of current connected hosts
+	public static HashSet currentConnectedHosts = new HashSet();
 
 	public static void registerConnection(String host) {
 		currentConnectedHosts.add(host);
 	}
-	
+
 	public static void unregisterConnection(String host) {
 		currentConnectedHosts.remove(host);	
 		// Put it in recent for a while...
 		recentConnectedHosts.put(host, new Long(System.currentTimeMillis()));
 		
 		long now = System.currentTimeMillis();
-		if (now - lastExpireTime > 5000) {
+		if (now - lastExpireTime > RECENT_CONNECTED_EXPIRE_CHECK) {
 			lastExpireTime = now;
 			Iterator i = recentConnectedHosts.keySet().iterator();
 			while(i.hasNext()) {
 				String h = (String)i.next();
 				long t = ((Long)recentConnectedHosts.get(h)).longValue();
-				if (now - t > 30000) {
+				if ((now - t) > RECENT_CONNECTED_TIME) {
 					i.remove();				// Expire it	
 				}
 			}
 		}
 	}
 
+	/**
+	 * Add a new connection to the given address
+	 *
+	 */
 	public static void addConnection(MultiAddress ma) {
-		if (currentConnectedHosts.size()>max_size) return;		// 500 max for now
-
+		// For now, we're only doing TCP connections
 		if (!ma.isTCPIP()) return;
+
+		// If we already have enough, drop it.
+		if (currentConnectedHosts.size() > max_size) return;
+
 		String host = ma.getHost();
 		int port = ma.getTCPPort();
-
 		try {
+			// We are already connected to the host
 			if (currentConnectedHosts.contains(host)) {
 				return;
 			}
 			
+			// We've recently been connected to the host
 			if (recentConnectedHosts.containsKey(host)) {
 				return;
 			}
 	
 			InetSocketAddress isa = new InetSocketAddress(host, port);
 			
+			// Ignore local addresses (LAN etc).
 			if (isa.getAddress().isSiteLocalAddress()) {
-				// It's a local address. Ignore it...
 				return;
 			}
 
@@ -188,10 +202,15 @@ public class Crawl implements IOCoreListener {
 		}
 	}
 
+	/**
+	 * The IOCore calls back to us here to tell us if connects were successful
+	 * or not.
+	 */
     public void connectionCallback(Node n, boolean success) {
     	long now = System.currentTimeMillis();
     	// Write to connectivity log...
     	outputs.writeFile("connectivity", now + "," + n.getInetSocketAddress().getAddress().getHostAddress() + "," + n.getInetSocketAddress().getPort() + "," + success + "\n");
+    	
     	String host = (String)n.properties.get("host");
     	if (!success) {
     		unregisterConnection(host);

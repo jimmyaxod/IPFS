@@ -156,7 +156,7 @@ public class DHTPlugin extends IOPlugin {
 							System.err.println("Multihash issue? " + e);	
 						}
 						Crawl.outputs.writeFile("dht_add_provider", now2 + "," + rhost + "," + rport + "," + key + "," + mhkey + "\n");
-					} else if (msgType.equals("GET_PROVIDER")) {
+					} else if (msgType.equals("GET_PROVIDERS")) {
 						String key = ByteUtil.toHexString(msg.getKey().toByteArray());
 						String mhkey = "";
 						try {
@@ -165,7 +165,7 @@ public class DHTPlugin extends IOPlugin {
 						} catch(RuntimeException e) {
 							System.err.println("Multihash issue? " + e);	
 						}
-						Crawl.outputs.writeFile("dht_get_provider", now2 + "," + rhost + "," + rport + "," + key + "," + mhkey + "\n");
+						Crawl.outputs.writeFile("dht_get_providers", now2 + "," + rhost + "," + rport + "," + key + "," + mhkey + "\n");
 					}
 				} catch(Exception e) {
 					System.err.println("DHT Exception: " + e);

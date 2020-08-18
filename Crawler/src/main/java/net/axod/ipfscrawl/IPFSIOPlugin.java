@@ -48,8 +48,7 @@ public class IPFSIOPlugin extends IOPlugin {
     
     public String host = null;
 
-    public String crypto = "noise";		// or secio...
-    boolean sent_noise_opening = false;
+    public String crypto = "secio";		// or secio...
     
     OutgoingMultistreamSelectSession multi_noise = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_NOISE);
     
@@ -133,34 +132,14 @@ public class IPFSIOPlugin extends IOPlugin {
 
 		// ======== multistream select scio ================================
 		if (crypto.equals("noise") && multi_noise.process(in, out)) {
-			
-			if (!sent_noise_opening) {
-				byte[] data = noise.getEncodedPublicKey();
-				out.order(ByteOrder.BIG_ENDIAN);
-				out.putShort((short)data.length);
-				out.put(data);
-				sent_noise_opening = true;	
-				System.out.println("Sent noise key - " + ByteUtil.toHexString(data));
-			}
+			try {
+				LinkedList spackets = noise.process(in, out, mykeys);
 
-			// Now we have to do the noise protocol stuff...
-			if (in.position()>0) {
-				in.flip();
-
-				in.order(ByteOrder.BIG_ENDIAN);
-				int packet_size = in.getShort();
-				System.out.println("NOISE handshake size " + packet_size);
-				byte[] a = new byte[packet_size];
-				in.get(a);
-				in.compact();
-				System.out.println("NOISE DATA " + ByteUtil.toHexString(a));
-
-				// 32 bytes		-> ne
-				// 32-80 bytes	-> ns
-				// rest			-> ciphertext
-				
-				// Now we should parse the data...
-				
+				// TODO...
+			} catch(NoiseException ne) {
+				logger.info("Exception within noise " + ne);
+				close();
+				return;
 			}
 		}
 
