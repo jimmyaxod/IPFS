@@ -13,7 +13,6 @@ import net.axod.crypto.keys.*;
 import net.axod.util.*;
 import net.axod.measurement.*;
 
-
 import com.google.protobuf.*;
 import com.google.protobuf.util.*;
 
@@ -35,9 +34,6 @@ import javax.crypto.spec.*;
 /**
  * This represents a connection to an IPFS node.
  *
- * We need to jump through several hoops before we can get to the interesting
- * bits.
- *
  *
  *
  */
@@ -48,21 +44,21 @@ public class IPFSIOPlugin extends IOPlugin {
     
     public String host = null;
 
-    public String crypto = "secio";		// or secio...
+    public String crypto = "secio";		// "noise" or "secio"
     
+    // Negotiate 'noise'
     OutgoingMultistreamSelectSession multi_noise = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_NOISE);
-    
+    // A noise session
     public NoiseSession noise = new NoiseSession();
     
-    // Negotiate multistream secio
+    // Negotiate 'secio'
 	OutgoingMultistreamSelectSession multi_secio = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_SECIO);
-	
 	// This handles a SECIO session
 	public SecioSession secio = new SecioSession(false);
 
-	// Negotiate multistream yamux
+	// Negotiate 'yamux'
 	OutgoingMultistreamSelectSession multi_yamux = new OutgoingMultistreamSelectSession(OutgoingMultistreamSelectSession.PROTO_YAMUX);
-	
+
 	ByteBuffer yamuxInbuffer = ByteBuffer.allocate(200000);
 	YamuxSession yamux = new YamuxSession(new HandlerIncomingFactory(client), true);	
 	boolean sentInitYamux = false;
@@ -85,24 +81,26 @@ public class IPFSIOPlugin extends IOPlugin {
         host = (String)n.properties.get("host");
         Crawl.registerConnection(host);        
 
-		// Setup client
+		// Setup our client info
 		client.node = n;
 		client.secio = secio;
         client.host = this.host;
         client.iop = this;
 	}
 
+	// Max timeout
 	private long ctime = System.currentTimeMillis();
 	private long MAX_TIME = 60*1000;
 
+	// Are we on the DHT now?
 	private boolean on_dht = false;
 	
 	/**
 	 * Does the plugin need to send anything
+	 *
 	 */
 	public boolean wantsToWork() {
-		// If we're at this stage, we need to send a multistream select...
-		
+		// First stage, if we need to send multistream handshake for crypto		
 		if (crypto.equals("secio") && !multi_secio.sent_handshake) {
 		 	return true;
 		}
@@ -111,9 +109,15 @@ public class IPFSIOPlugin extends IOPlugin {
 		 	return true;
 		}
 		
+		// Second stage, if we need to send mutlistream handshake for mux
 		if (secio.handshaked() && !multi_yamux.sent_handshake) {
 			return true;	
 		}
+		
+		// Now we should check if anything inside yamux wants to do things
+		if (yamux.wantsToWork()) return true;
+		
+		// Finally, check if we should timeout
 		long now = System.currentTimeMillis();
 		if (now - ctime > MAX_TIME) return true;
 		return false;	
@@ -125,12 +129,14 @@ public class IPFSIOPlugin extends IOPlugin {
 	 */
 	public void work() {
 		long now = System.currentTimeMillis();
+		
+		// First, if we have been around too long, close and exit.
 		if (now - ctime > MAX_TIME) {
 			close();
 			return;
 		}
 
-		// ======== multistream select scio ================================
+		// ======== multistream select noise ================================
 		if (crypto.equals("noise") && multi_noise.process(in, out)) {
 			try {
 				LinkedList spackets = noise.process(in, out, mykeys);
@@ -143,7 +149,7 @@ public class IPFSIOPlugin extends IOPlugin {
 			}
 		}
 
-		// ======== multistream select scio ================================
+		// ======== multistream select secio ================================
 		if (crypto.equals("secio") && multi_secio.process(in, out)) {
 			try {
 				LinkedList spackets = secio.process(in, out, mykeys);
@@ -153,9 +159,12 @@ public class IPFSIOPlugin extends IOPlugin {
 						byte[] pack = (byte[])spackets.get(i);
 						processSecioPacket(pack);
 					}
-	
-					// If we need to do something inside...
-					processSecioPacket(null);
+
+					if (!multi_yamux.sent_handshake
+						|| yamux.wantsToWork()) {
+						// If we need to do something inside...
+						processSecioPacket(null);
+					}
 				}
 			} catch(SecioException se) {
 				logger.info("Exception within secio " + se);
@@ -191,7 +200,7 @@ public class IPFSIOPlugin extends IOPlugin {
 			}
 			processYamuxPackets(yamuxInbuffer);
 		}
-		
+
 		// Send any multistream handshake stuff to next layer
 		outbuff.flip();
 		if (outbuff.remaining()>0) {
@@ -219,7 +228,7 @@ public class IPFSIOPlugin extends IOPlugin {
 		// Once we've done IPFS ID, lets open an outgoing KAD DHT stream.
 		yamux.setupOutgoingStream(new HandlerKADDHT(client));
 	}
-
+               
 	/**
 	 * Deal with Yamux packets...
 	 *

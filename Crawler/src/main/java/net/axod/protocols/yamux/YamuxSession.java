@@ -77,6 +77,22 @@ public class YamuxSession {
 	}
 
 	/**
+	 * Go through plugins, check if they want to do something...
+	 *
+	 */
+	public boolean wantsToWork() {
+		Iterator i = activeIOPlugins.keySet().iterator();
+		while(i.hasNext()) {
+			Integer stream_id = (Integer)i.next();
+			IOPlugin iop = (IOPlugin)activeIOPlugins.get(stream_id);
+			if (iop.wantsToWork()) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	/**
 	 * Process data
 	 *
 	 * @param	in	Input buffer

@@ -4,6 +4,11 @@ import net.axod.io.*;
 
 import java.net.*;
 
+/**
+ * Gives us a way to create new IPFSIOPluginIn
+ * This is for incoming TCP Connections.
+ *
+ */
 public class IPFSIOPluginFactoryIn implements IOPluginFactory {
 	
 	public IPFSIOPluginFactoryIn() {
